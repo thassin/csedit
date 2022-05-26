@@ -44,10 +44,14 @@ namespace RoslynPad.Roslyn
         public ImmutableArray<string> DefaultImports { get; }
         public ImmutableArray<string> DisabledDiagnostics { get; }
 
-        public RoslynHost(IEnumerable<Assembly>? additionalAssemblies = null,
+        public LanguageVersion LangVersion { get; private set; }
+
+        public RoslynHost(LanguageVersion langVersion,
+            IEnumerable<Assembly>? additionalAssemblies = null,
             RoslynHostReferences? references = null,
             ImmutableArray<string>? disabledDiagnostics = null)
         {
+            LangVersion = langVersion;
             if (references == null) references = RoslynHostReferences.Empty;
 
             _workspaces = new ConcurrentDictionary<DocumentId, RoslynWorkspace>();
@@ -88,7 +92,7 @@ namespace RoslynPad.Roslyn
 
         protected virtual ParseOptions CreateDefaultParseOptions() => new CSharpParseOptions(
             preprocessorSymbols: PreprocessorSymbols,
-            languageVersion: LanguageVersion.Preview);
+            languageVersion: LangVersion);
 
         public MetadataReference CreateMetadataReference(string location) => MetadataReference.CreateFromFile(location,
             documentation: _documentationProviderService.GetDocumentationProvider(location));
@@ -309,6 +313,139 @@ namespace RoslynPad.Roslyn
 
                 return string.Empty;
             }
+        }
+
+        // new experimental stuff...
+        // new experimental stuff...
+        // new experimental stuff...
+
+        // the methods below allow project setup with multiple source files in the same project.
+
+        public virtual Project CreateProject_alt(RoslynWorkspace workspace, ref Solution solution, string name, SourceCodeKind kind, CompilationOptions compilationOptions)
+        {
+            solution = workspace.CurrentSolution.AddAnalyzerReferences(GetSolutionAnalyzerReferences());
+
+            //var name = args.Name ?? "New";
+            var id = ProjectId.CreateNewId(name);
+
+            var parseOptions = ParseOptions.WithKind(kind);
+            var isScript = kind == SourceCodeKind.Script;
+
+            if (isScript)
+            {
+                compilationOptions = compilationOptions.WithScriptClassName(name);
+            }
+
+            Console.WriteLine( "CreateProject_alt : DefaultReferences.Length = " + DefaultReferences.Length );
+            foreach ( var x in DefaultReferences ) Console.WriteLine( "    " + x.ToString() );
+
+            solution = solution.AddProject(ProjectInfo.Create(
+                id,
+                VersionStamp.Create(),
+                name,
+                name,
+                LanguageNames.CSharp,
+                isSubmission: isScript,
+                parseOptions: parseOptions,
+                compilationOptions: compilationOptions,
+
+                //metadataReferences: ImmutableArray<MetadataReference>.Empty, VARO ei toimi
+                metadataReferences: DefaultReferences,
+
+                //projectReferences: previousProject != null ? new[] { new ProjectReference(previousProject.Id) } : null
+                projectReferences: null
+
+                ));
+
+            workspace.SetCurrentSolution( solution );
+
+            var project = solution.GetProject(id)!;
+
+            if (!isScript && LangVersion >= LanguageVersion.CSharp10 && GetUsings(project) is { Length: > 0 } usings)
+            {
+                Document doc = project.AddDocument("RoslynPadGeneratedUsings", usings);
+                project = doc.Project;
+                solution = doc.Project.Solution; // TODO need this as well???
+
+                Console.WriteLine("ADDED global usings:");
+                Console.WriteLine(usings);
+            }
+
+            return project;
+
+            static string GetUsings(Project project)
+            {
+                if (project.CompilationOptions is CSharpCompilationOptions options)
+                {
+                    return string.Join(" ", options.Usings.Select(i => $"global using {i};"));
+                }
+
+                return string.Empty;
+            }
+        }
+
+        public virtual CompilationOptions CreateCompilationOptions_alt(string workingDirectory, bool addDefaultImports)
+        {
+            Console.WriteLine( "CreateCompilationOptions_alt() : DefaultImports.Length = " + DefaultImports.Length );
+            foreach ( var x in DefaultImports ) Console.WriteLine( "    " + x.ToString() );
+
+            var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                usings: addDefaultImports ? DefaultImports : ImmutableArray<string>.Empty,
+                allowUnsafe: true,
+                sourceReferenceResolver: null, // new SourceFileResolver(ImmutableArray<string>.Empty, workingDirectory),
+
+                // all #r references are resolved by the editor/msbuild
+                metadataReferenceResolver: null, // DummyScriptMetadataResolver.Instance, // ongelma... varmaankin???
+
+                // TODO nullableContextOptions is only for languageversion 8 and above.
+                nullableContextOptions: NullableContextOptions.Enable);
+            return compilationOptions;
+        }
+
+        public DocumentId AddDocument_alt(RoslynWorkspace workspace, ref Solution solution, ref Project project, DocumentCreationArgs args, string name)
+        {
+            var document = CreateDocument_alt(ref solution, ref project, args, name);
+            var documentId = document.Id;
+
+            workspace.SetCurrentSolution(solution);
+
+            workspace.OpenDocument(documentId, args.SourceTextContainer);
+
+            _workspaces.TryAdd(documentId, workspace);
+
+            if (args.OnDiagnosticsUpdated != null)
+            {
+                _diagnosticsUpdatedNotifiers.TryAdd(documentId, args.OnDiagnosticsUpdated);
+            }
+
+            var onTextUpdated = args.OnTextUpdated;
+            if (onTextUpdated != null)
+            {
+                workspace.ApplyingTextChange += (d, s) =>
+                {
+                    if (documentId == d) onTextUpdated(s);
+                };
+            }
+
+            return documentId;
+        }
+
+        protected virtual Document CreateDocument_alt(ref Solution solution, ref Project project, DocumentCreationArgs args, string name)
+        {
+            Console.WriteLine( "CreateDocument_alt() : name='" + name + "'" );
+
+            Document doc = project.AddDocument( name, args.SourceTextContainer.CurrentText );
+
+            project = doc.Project;
+            solution = doc.Project.Solution;
+            return doc;
+        }
+
+        public void AddMetadataReference_alt(RoslynWorkspace workspace, ref Solution solution, ref Project project, MetadataReference mdr) {
+
+            project = project.AddMetadataReference( mdr );
+
+            solution = project.Solution;
         }
     }
 }
