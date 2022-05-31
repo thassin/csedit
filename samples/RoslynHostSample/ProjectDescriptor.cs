@@ -16,28 +16,37 @@ namespace RoslynHostSample
         public List<string> SourceFiles { get; set; }
         public List<string> LibraryFiles { get; set; }
 
+        // TODO how to check validity of these???
+        public List<string> ProjectReferences { get; set; }
+
+        public string Name { get; private set; }
+
         private string libraryPath;
         private Dictionary<DocumentId,string> docId_2_filename;
 
-        private Project project;
+        private ProjectId pId;
 
-        public ProjectDescriptor( string libPath )
+        public ProjectDescriptor( string name, string libPath )
         {
+            Name = name;
             libraryPath = libPath;
             docId_2_filename = new Dictionary<DocumentId,string>();
 
             SourceFiles = new List<string>();
             LibraryFiles = new List<string>();
 
-            project = null;
+            ProjectReferences = new List<string>();
+
+            pId = null;
         }
 
-        public Project CreateProject(RoslynHost host, RoslynWorkspace ws, ref Solution sol, CompilationOptions compilationOptions)
+        public ProjectId CreateProject( RoslynHost host, RoslynWorkspace ws, ref Solution sol, CompilationOptions compilationOptions, List<ProjectReference> projectReferences )
         {
             // create a new project (previous must not exist).
-            if ( project != null ) throw new Exception("project already exists!");
+            if ( pId != null ) throw new Exception("project already exists!");
 
-            project = host.CreateProject_alt( ws, ref sol, "myproject", SourceCodeKind.Regular, compilationOptions );
+            Project project = host.CreateProject_alt( ws, ref sol, Name, SourceCodeKind.Regular, compilationOptions, projectReferences );
+            pId = project.Id;
 
             // add all specified libraries and sourcefiles.
             // => it seems that the libraries must be added first.
@@ -64,7 +73,20 @@ namespace RoslynHostSample
                 docId_2_filename.Add( d_Id, srcFilePath );
             }
 
-            return project;
+            return pId;
+        }
+
+        public ProjectId GetProjectId()
+        {
+            if ( pId == null ) throw new Exception( "GetProjectId() : pId is null (project not yet created)." );
+            return pId;
+        }
+
+        public void AddProjectReference( RoslynHost host, RoslynWorkspace ws, ref Solution sol, ProjectReference pr )
+        {
+            Project project = sol.GetProject( pId );
+            project = project.AddProjectReference( pr );
+            sol = project.Solution;
         }
 
 	public void PrintFeedback( DiagnosticsUpdatedArgs x ) {
@@ -84,13 +106,13 @@ namespace RoslynHostSample
                 }
 
                 Console.WriteLine( d.Severity.ToString() + " at line " + line + " position " + position + " : " + fileName );
-                Console.WriteLine( "  M->    " + d.Message );
                 Console.WriteLine( "  T->    " + d.Title ); // sometimes the same as previous?
+                Console.WriteLine( "  M->    " + d.Message );
             }
             Console.WriteLine();
 	}
 
-        public void DumpSolutionContents( Solution sol ) {
+        public static void DumpSolutionContents( Solution sol ) {
             Console.WriteLine();
             Console.WriteLine();
             Console.WriteLine( "dump SOLUTION contents:" );
@@ -98,6 +120,9 @@ namespace RoslynHostSample
                 Console.WriteLine( "    PROJECT " + p.Name );
                 foreach ( var a in p.MetadataReferences ) {
                     Console.WriteLine( "        Assembly " + a.Display );
+                }
+                foreach ( var x in p.ProjectReferences ) {
+                    Console.WriteLine( "        ProjectReference " + x.ToString() );
                 }
                 foreach ( var d in p.Documents ) {
                     Console.WriteLine( "        DOCUMENT " + d.Name );

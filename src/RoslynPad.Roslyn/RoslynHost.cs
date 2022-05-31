@@ -321,11 +321,13 @@ namespace RoslynPad.Roslyn
 
         // the methods below allow project setup with multiple source files in the same project.
 
-        public virtual Project CreateProject_alt(RoslynWorkspace workspace, ref Solution solution, string name, SourceCodeKind kind, CompilationOptions compilationOptions)
+        public void AddAnalyzerReferences(RoslynWorkspace workspace,ref Solution solution)
         {
             solution = workspace.CurrentSolution.AddAnalyzerReferences(GetSolutionAnalyzerReferences());
+        }
 
-            //var name = args.Name ?? "New";
+        public virtual Project CreateProject_alt(RoslynWorkspace workspace, ref Solution solution, string name, SourceCodeKind kind, CompilationOptions compilationOptions, List<ProjectReference> projectReferences)
+        {
             var id = ProjectId.CreateNewId(name);
 
             var parseOptions = ParseOptions.WithKind(kind);
@@ -349,11 +351,10 @@ namespace RoslynPad.Roslyn
                 parseOptions: parseOptions,
                 compilationOptions: compilationOptions,
 
-                //metadataReferences: ImmutableArray<MetadataReference>.Empty, VARO ei toimi
+                //metadataReferences: ImmutableArray<MetadataReference>.Empty, // WATCH OUT not working...
                 metadataReferences: DefaultReferences,
 
-                //projectReferences: previousProject != null ? new[] { new ProjectReference(previousProject.Id) } : null
-                projectReferences: null
+                projectReferences: projectReferences.Count > 0 ? projectReferences : null
 
                 ));
 
