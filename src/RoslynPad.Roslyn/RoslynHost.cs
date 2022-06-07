@@ -2,6 +2,7 @@
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Host.Mef;
+using Microsoft.CodeAnalysis.Text;
 using RoslynPad.Roslyn.Diagnostics;
 using System;
 using System.Collections.Concurrent;
@@ -403,44 +404,59 @@ namespace RoslynPad.Roslyn
             return compilationOptions;
         }
 
-        public DocumentId AddDocument_alt(RoslynWorkspace workspace, ref Solution solution, ref Project project, DocumentCreationArgs args, string name)
+        public DocumentId AddDocument_alt(RoslynWorkspace workspace, ref Solution solution, ref Project project, DocumentCreationArgs args, string name, string currentText)
         {
-            var document = CreateDocument_alt(ref solution, ref project, args, name);
+            var document = CreateDocument_alt(ref solution, ref project, args, name, currentText);
             var documentId = document.Id;
 
             workspace.SetCurrentSolution(solution);
-
-            workspace.OpenDocument(documentId, args.SourceTextContainer);
-
             _workspaces.TryAdd(documentId, workspace);
-
-            if (args.OnDiagnosticsUpdated != null)
-            {
-                _diagnosticsUpdatedNotifiers.TryAdd(documentId, args.OnDiagnosticsUpdated);
-            }
-
-            var onTextUpdated = args.OnTextUpdated;
-            if (onTextUpdated != null)
-            {
-                workspace.ApplyingTextChange += (d, s) =>
-                {
-                    if (documentId == d) onTextUpdated(s);
-                };
-            }
 
             return documentId;
         }
 
-        protected virtual Document CreateDocument_alt(ref Solution solution, ref Project project, DocumentCreationArgs args, string name)
+        protected virtual Document CreateDocument_alt(ref Solution solution, ref Project project, DocumentCreationArgs args, string name, string currentText)
         {
             Console.WriteLine( "CreateDocument_alt() : name='" + name + "'" );
 
-            Document doc = project.AddDocument( name, args.SourceTextContainer.CurrentText );
+            Document doc = project.AddDocument( name, currentText );
 
             project = doc.Project;
             solution = doc.Project.Solution;
             return doc;
         }
+
+        public void OpenDocument_alt( RoslynWorkspace workspace, DocumentId documentId, SourceTextContainer sourceTextContainer, Action<DiagnosticsUpdatedArgs>? onDiagnosticsUpdated, Action<SourceText>? onTextUpdated ) {
+
+            workspace.OpenDocument(documentId, sourceTextContainer);
+
+            if (onDiagnosticsUpdated != null)
+            {
+                _diagnosticsUpdatedNotifiers.TryAdd(documentId, onDiagnosticsUpdated);
+            }
+
+            if (onTextUpdated != null)
+            {
+                workspace.ApplyingTextChange += (d, s) =>
+                {
+Console.WriteLine( "ApplyingTextChange-lambda-called (never happens?)" );
+                    if (documentId == d) onTextUpdated(s);
+                    else Console.WriteLine( "ApplyingTextChange failed - documentid mismatch" );
+                };
+            }
+        }
+
+        public void CloseDocument_alt( RoslynWorkspace workspace, DocumentId documentId )
+        {
+Console.WriteLine();
+Console.WriteLine("CLOSING DOCUMENT :: "+ documentId.ToString());
+Console.WriteLine();
+// https://docs.microsoft.com/en-us/dotnet/api/microsoft.codeanalysis.workspace?view=roslyn-dotnet-4.2.0 
+            workspace.CloseDocument_fixme(documentId);
+            _diagnosticsUpdatedNotifiers.TryRemove( documentId, out _ );
+        }
+
+
 
         public void AddMetadataReference_alt(RoslynWorkspace workspace, ref Solution solution, ref Project project, MetadataReference mdr) {
 

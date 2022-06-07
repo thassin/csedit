@@ -45,6 +45,9 @@ namespace RoslynPad.Editor
 
         private void DocumentOnChanged(object? sender, DocumentChangeEventArgs e)
         {
+
+Console.WriteLine( "AETC.DocumentOnChanged -> forward the text modifications" );
+
             if (_updatding) return;
 
             var oldText = _currentText;

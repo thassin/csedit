@@ -17,6 +17,8 @@ namespace RoslynPad.Roslyn
             Name = name;
         }
 
+// TODO should these be separated to "creation" and "opening" args?
+
         public SourceTextContainer SourceTextContainer { get; }
         public string WorkingDirectory { get; }
         public SourceCodeKind SourceCodeKind { get; }

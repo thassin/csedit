@@ -1,0 +1,25 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:editor="clr-namespace:RoslynPad.Editor;assembly=RoslynPad.Editor.Avalonia"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        x:Class="CsEdit.Avalonia.CsEditCodeEditorWindow"
+        Title="CsEditCodeEditorWindow"
+        Width="525" Height="350" >
+
+            <StackPanel>
+
+                        <editor:RoslynCodeEditor x:Name="EditorXX"
+                                                 Margin="5"
+                                                 
+                                                 Foreground="#D4D4D4"
+                                                 IsReadOnly="{Binding IsReadOnly}"
+                                                 HorizontalScrollBarVisibility="Auto"
+                                                 VerticalScrollBarVisibility="Auto"
+                                                 ShowLineNumbers="False"
+					         Height="300" Width="500" />
+              </StackPanel>
+
+
+</Window>

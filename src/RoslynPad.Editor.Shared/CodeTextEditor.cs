@@ -75,6 +75,9 @@ namespace RoslynPad.Editor
             ContextMenu = contextMenu;
 
             Initialize();
+
+            Console.WriteLine( "setup SyntaxHighlighting (using extension .cs)" );
+            SyntaxHighlighting = HighlightingManager.Instance.GetDefinitionByExtension(".cs");
         }
 
         partial void Initialize();

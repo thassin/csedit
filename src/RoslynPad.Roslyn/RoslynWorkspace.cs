@@ -10,6 +10,11 @@ namespace RoslynPad.Roslyn
     public class RoslynWorkspace : Workspace
     {
         public DocumentId? OpenDocumentId { get; private set; }
+
+// TODO need to support opening/closing of multiple documents???
+// TODO need to support opening/closing of multiple documents???
+// TODO need to support opening/closing of multiple documents???
+
         public RoslynHost? RoslynHost { get; }
 
         public RoslynWorkspace(HostServices hostServices, string workspaceKind = WorkspaceKind.Host, RoslynHost? roslynHost = null)
@@ -52,6 +57,19 @@ namespace RoslynPad.Roslyn
             OnDocumentContextUpdated(documentId);
         }
 
+        public void CloseDocument_fixme(DocumentId documentId)
+        {
+            OpenDocumentId = null;
+            //OnDocumentClosed(documentId, null, false); // what is a reloader???
+            OnDocumentClosing(documentId);
+            OnDocumentContextUpdated(documentId);
+
+            ClearOpenDocument(documentId); // this MUST be called.
+            CheckDocumentIsClosed(documentId); // otherwise crash here...
+        }
+
+
+
         public event Action<DocumentId, SourceText>? ApplyingTextChange;
 
         protected override void Dispose(bool finalize)
@@ -67,6 +85,7 @@ namespace RoslynPad.Roslyn
         {
             if (OpenDocumentId != document)
             {
+Console.WriteLine( "RoslynWorkspace.ApplyDocumentTextChanged() FAILED." );
                 return;
             }
 

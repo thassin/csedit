@@ -9,11 +9,24 @@ using RoslynPad.Roslyn.Diagnostics; // DiagnosticsUpdatedArgs
 
 using Microsoft.CodeAnalysis; // SourceCodeKind
 
-namespace RoslynHostSample
+namespace CsEdit.Avalonia
 {
+
+// TODO this should be an inner class?
+// TODO this should be an inner class?
+// TODO this should be an inner class?
+
     public class PD_DocumentInfo {
         public DocumentId DocId { get; set; }
         public string FilePathRel { get; set; }
+
+// need to have anything else here???
+// need to have anything else here???
+// need to have anything else here???
+
+        public string currentText { get; set; }
+        public AvalonEditTextContainer currentTextContainer { get; set; }
+        public bool IsEditorWindowOpen { get; set; }
     }
 
     public class ProjectDescriptor
@@ -69,17 +82,19 @@ namespace RoslynHostSample
                 string source = File.ReadAllText( srcFilePath );
 
                 AvaloniaEdit.Document.TextDocument d = new AvaloniaEdit.Document.TextDocument( source );
-                AvalonEditTextContainer c = new AvalonEditTextContainer( d ); // IS NEEDED in this app...
 
                 DocumentId d_Id = host.AddDocument_alt( ws, ref sol, ref project, null, srcFilePath, source );
 
                 PD_DocumentInfo docInfo = new PD_DocumentInfo();
+
                 docInfo.DocId = d_Id;
                 docInfo.FilePathRel = srcFilePath;
 
-                docInfoDict.Add( d_Id, docInfo );
+                docInfo.currentText = source;
+                docInfo.currentTextContainer = null;
+                docInfo.IsEditorWindowOpen = false;
 
-                host.OpenDocument_alt( ws, d_Id, c, PrintFeedback, null );
+                docInfoDict.Add( d_Id, docInfo );
             }
 
             return pId;

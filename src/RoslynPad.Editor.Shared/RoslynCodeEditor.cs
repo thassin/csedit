@@ -1,4 +1,5 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Text;
 using RoslynPad.Roslyn;
 using RoslynPad.Roslyn.BraceMatching;
 using RoslynPad.Roslyn.Diagnostics;
@@ -99,7 +100,8 @@ namespace RoslynPad.Editor
 
             _documentId = creatingDocumentArgs.DocumentId ??
                 roslynHost.AddDocument(new DocumentCreationArgs(avalonEditTextContainer, workingDirectory, sourceCodeKind,
-                    args => ProcessDiagnostics(args), text => avalonEditTextContainer.UpdateText(text)));
+                    args => { Console.WriteLine( "  ---->>  DIAGNOSTICS" ); ProcessDiagnostics(args); },
+		    text => { Console.WriteLine( "  ---->>  TEXTUPDATE (never happens?)" ); avalonEditTextContainer.UpdateText(text); } ));
 
             AppendText(documentText);
             Document.UndoStack.ClearAll();
@@ -117,6 +119,65 @@ namespace RoslynPad.Editor
 
             return _documentId;
         }
+
+
+
+        public DocumentId Initialize_alt( RoslynHost roslynHost, RoslynWorkspace workspace, DocumentId docId, string currentText, IClassificationHighlightColors highlightColors, out AvalonEditTextContainer container )
+        {
+            _roslynHost = roslynHost ?? throw new ArgumentNullException(nameof(roslynHost));
+            _classificationHighlightColors = highlightColors ?? throw new ArgumentNullException(nameof(highlightColors));
+
+            _braceMatcherHighlighter = new BraceMatcherHighlightRenderer(TextArea.TextView, _classificationHighlightColors);
+
+            _quickInfoProvider = _roslynHost.GetService<IQuickInfoProvider>();
+            _braceMatchingService = _roslynHost.GetService<IBraceMatchingService>();
+
+            var avalonEditTextContainer = new AvalonEditTextContainer(Document) { Editor = this };
+            container = avalonEditTextContainer;
+
+            var creatingDocumentArgs = new CreatingDocumentEventArgs(avalonEditTextContainer, ProcessDiagnostics);
+            OnCreatingDocument(creatingDocumentArgs);
+
+            if ( docId != null ) creatingDocumentArgs.DocumentId = docId;
+            else throw new Exception("docId is null in Initialize_alt");
+
+var info = "<null>";
+if ( creatingDocumentArgs.DocumentId != null ) info = creatingDocumentArgs.DocumentId.ToString();
+Console.WriteLine( "RCE.Initialize() :: creatingDocumentArgs.DocumentId = " + info );
+
+            _documentId = docId;
+
+roslynHost.OpenDocument_alt( workspace, docId, avalonEditTextContainer,
+	args => { Console.WriteLine( "  ---->>  DIAGNOSTICS" ); ProcessDiagnostics(args); },
+	text => { Console.WriteLine( "  ---->>  TEXTUPDATE (never happens?)" ); avalonEditTextContainer.UpdateText(text); } );
+
+// created a new AvalonEditTextContainer so that it is initially empty.
+// => it has no connection to Roslynin "Document"-objects etc?!?
+// => here we just initialize an identical text content.
+
+            AppendText( currentText );
+
+            Document.UndoStack.ClearAll();
+            AsyncToolTipRequest = OnAsyncToolTipRequest;
+
+            RefreshHighlighting();
+
+            _contextActionsRenderer = new ContextActionsRenderer(this, _textMarkerService) { IconImage = ContextActionsIcon };
+            _contextActionsRenderer.Providers.Add(new RoslynContextActionProvider(_documentId, _roslynHost));
+
+            var completionProvider = new RoslynCodeEditorCompletionProvider(_documentId, _roslynHost);
+            completionProvider.Warmup();
+
+            CompletionProvider = completionProvider;
+
+            return _documentId;
+        }
+
+        public void OnClosing( RoslynHost roslynHost, RoslynWorkspace workspace, DocumentId docId ) {
+            roslynHost.CloseDocument_alt( workspace, docId );
+        }
+
+
 
         public void RefreshHighlighting()
         {
@@ -229,6 +290,34 @@ namespace RoslynPad.Editor
 
         protected void ProcessDiagnostics(DiagnosticsUpdatedArgs args)
         {
+
+
+
+// print out the diagnostics at console...
+// print out the diagnostics at console...
+// print out the diagnostics at console...
+            DiagnosticsUpdatedArgs x = args;
+            Console.WriteLine( "received diagnostics feedback:" );
+            Console.WriteLine( "kind : " + x.Kind.ToString() );
+            foreach ( RoslynPad.Roslyn.Diagnostics.DiagnosticData d in x.Diagnostics ) {
+
+                RoslynPad.Roslyn.Diagnostics.DiagnosticDataLocation? loc = d.DataLocation;
+                if ( loc == null ) continue;
+
+                // add +1 to line/column information (it starts from zero).
+                int line = loc.OriginalStartLine + 1;
+                int position = loc.OriginalStartColumn + 1;
+
+                string fileName = "<unknown>";
+
+                Console.WriteLine( d.Severity.ToString() + " at line " + line + " position " + position + " : " + fileName );
+                Console.WriteLine( "  T->    " + d.Title ); // sometimes the same as previous?
+                Console.WriteLine( "  M->    " + d.Message );
+            }
+            Console.WriteLine();
+
+
+
             if (this.GetDispatcher().CheckAccess())
             {
                 ProcessDiagnosticsOnUiThread(args);
