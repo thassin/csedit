@@ -14,7 +14,6 @@ namespace CsEdit.Avalonia
     public partial class MainWindow : Window
     {
         private Dictionary<DocumentId,string> allDocs = null;
-        private int EditorWindowCounter = 0;
 
         public MainWindow()
         {
@@ -35,14 +34,18 @@ namespace CsEdit.Avalonia
 
         private void OnButtonClick( object sender, RoutedEventArgs e )
         {
-            Console.WriteLine( "Open a new editor window." );
+            foreach( KeyValuePair<DocumentId,string> entry in allDocs ) {
+                if ( CsEditWorkspace.Instance.GetIsEditorWindowOpen( entry.Key ) ) continue;
 
-            KeyValuePair<DocumentId,string> entry = allDocs.ElementAt( EditorWindowCounter % allDocs.Count );
-            var wnd = new CsEditCodeEditorWindow();
-            wnd.Init( entry.Key, entry.Value );
-            wnd.Show();
+                var wnd = new CsEditCodeEditorWindow();
+                wnd.Init( entry.Key, entry.Value );
+                wnd.Show();
 
-            EditorWindowCounter++;
+                Console.WriteLine( "Opened a new editor window : " + entry.Key.ToString() );
+                return;
+            }
+
+            Console.WriteLine( "No more documents to open!" );
         }
 
 // https://docs.microsoft.com/en-us/dotnet/api/system.componentmodel.canceleventargs?view=net-6.0 
