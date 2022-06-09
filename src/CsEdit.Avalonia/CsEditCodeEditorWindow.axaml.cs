@@ -44,6 +44,23 @@ namespace CsEdit.Avalonia
 #if DEBUG
             this.AttachDevTools();
 #endif
+
+// "size" is of type (Avalonia.Controls.) Size?
+// https://stackoverflow.com/questions/70338154/avalonia-keep-window-position-after-resize
+            ClientSizeProperty.Changed.Subscribe( size =>
+            {
+                // http://reference.avaloniaui.net/api/Avalonia/AvaloniaPropertyChangedEventArgs/ 
+                if ( size.Sender != this ) {
+                    //Console.WriteLine( "ClientSizeProperty - SKIP this event." );
+                    return;
+                }
+
+                RoslynCodeEditor eee = this.FindControl<RoslynCodeEditor>("EditorXX");
+                eee.Width = size.NewValue.Value.Width - 10;
+                eee.Height = size.NewValue.Value.Height - 10;
+
+            });
+
         }
 
         private void InitializeComponent()

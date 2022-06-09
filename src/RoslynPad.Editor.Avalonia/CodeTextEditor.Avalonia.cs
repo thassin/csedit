@@ -56,6 +56,21 @@ namespace RoslynPad.Editor
                 CompletionList.ListBox.PointerPressed +=
                     (o, e) => _isSoftSelectionActive = false;
 
+
+
+// see AvaloniaEdit/CodeCompletion/CompletionWindowBase.cs line 88...
+            PlacementTarget = TextArea.TextView;
+            //PlacementMode = PlacementMode.AnchorAndGravity;
+            PlacementMode = PlacementMode.Pointer;
+            //PlacementAnchor = Avalonia.Controls.Primitives.PopupPositioning.PopupAnchor.TopLeft;
+            //PlacementGravity = Avalonia.Controls.Primitives.PopupPositioning.PopupGravity.BottomRight;
+
+// see AvaloniaEdit/CodeCompletion/CompletionWindowBase.cs line 115...
+                //SetPosition(TextArea.Caret.Position); // not needed?
+                //UpdatePosition(); // not needed?
+
+
+
                 // HACK alert - this is due to an Avalonia bug that assumes the parent of a PopupRoot must be a Popup (in our case it's a Window)
                 var toolTip = LogicalChildren.OfType<Avalonia.Controls.Primitives.Popup>().First();
                 LogicalChildren.Remove(toolTip);
