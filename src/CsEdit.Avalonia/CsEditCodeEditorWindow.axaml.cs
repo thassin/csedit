@@ -55,10 +55,12 @@ namespace CsEdit.Avalonia
                     return;
                 }
 
-                RoslynCodeEditor eee = this.FindControl<RoslynCodeEditor>("EditorXX");
-                eee.Width = size.NewValue.Value.Width - 10;
-                eee.Height = size.NewValue.Value.Height - 10;
+                RoslynCodeEditor editorControl = this.FindControl<RoslynCodeEditor>("EditorXX");
 
+                // set the RoslynCodeEditor size = resized parent size minus margins.
+
+                editorControl.Width = size.NewValue.Value.Width - 10;
+                editorControl.Height = size.NewValue.Value.Height - 10;
             });
 
         }
@@ -78,12 +80,31 @@ documentId = docId;
             DocumentViewModel dvm = new DocumentViewModel( host, null );
 
 Console.WriteLine( "looking for the editor control..." );
-RoslynCodeEditor eee = this.FindControl<RoslynCodeEditor>("EditorXX");
+RoslynCodeEditor editorControl = this.FindControl<RoslynCodeEditor>("EditorXX");
 
-eee.DataContext = dvm;
+MenuItem menuItem_testItem = new MenuItem { Header = "TestItem" };
+menuItem_testItem.Click += OnMenuClick;
 
-OnItemLoaded(eee, docId);
+editorControl.ContextMenu = new ContextMenu
+{
+    Items = new List<MenuItem>
+    {
+        //new MenuItem { Header = "Copy", InputGesture = new KeyGesture(Key.C, KeyModifiers.Control) },
+        //new MenuItem { Header = "Paste", InputGesture = new KeyGesture(Key.V, KeyModifiers.Control) },
+        //new MenuItem { Header = "Cut", InputGesture = new KeyGesture(Key.X, KeyModifiers.Control) }
+        menuItem_testItem
+    }
+};
 
+editorControl.DataContext = dvm;
+
+OnItemLoaded( editorControl, docId) ;
+
+        }
+
+        private void OnMenuClick(object sender, RoutedEventArgs e)
+        {
+            Console.WriteLine( "OnMenuClick() called!!!" );
         }
 
 
