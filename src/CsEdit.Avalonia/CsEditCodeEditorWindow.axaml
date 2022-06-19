@@ -24,9 +24,7 @@
 <!-- TODO how to make the scrollbars work correctly?
 	and window resizing in general?
 	one can set Width="NaN" Height="NaN" but it makes the scrollbars disappear.
-
 should a window-resize event be handled programmatically?
-
 -->
 
 

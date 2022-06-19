@@ -320,6 +320,8 @@ namespace RoslynPad.Roslyn
         // new experimental stuff...
         // new experimental stuff...
 
+        // ...see src/CsEdit.Avalonia + samples/RoslynHostSample.
+
         // the methods below allow project setup with multiple source files in the same project.
 
         public void AddAnalyzerReferences(RoslynWorkspace workspace,ref Solution solution)
@@ -397,16 +399,16 @@ namespace RoslynPad.Roslyn
                 sourceReferenceResolver: null, // new SourceFileResolver(ImmutableArray<string>.Empty, workingDirectory),
 
                 // all #r references are resolved by the editor/msbuild
-                metadataReferenceResolver: null, // DummyScriptMetadataResolver.Instance, // ongelma... varmaankin???
+                metadataReferenceResolver: null, // DummyScriptMetadataResolver.Instance, // ???
 
                 // TODO nullableContextOptions is only for languageversion 8 and above.
                 nullableContextOptions: NullableContextOptions.Enable);
             return compilationOptions;
         }
 
-        public DocumentId AddDocument_alt(RoslynWorkspace workspace, ref Solution solution, ref Project project, DocumentCreationArgs args, string name, string currentText)
+        public DocumentId AddDocument_alt(RoslynWorkspace workspace, ref Solution solution, ref Project project, DocumentCreationArgs args, string name, string initialText)
         {
-            var document = CreateDocument_alt(ref solution, ref project, args, name, currentText);
+            var document = CreateDocument_alt(ref solution, ref project, args, name, initialText);
             var documentId = document.Id;
 
             workspace.SetCurrentSolution(solution);
@@ -415,11 +417,11 @@ namespace RoslynPad.Roslyn
             return documentId;
         }
 
-        protected virtual Document CreateDocument_alt(ref Solution solution, ref Project project, DocumentCreationArgs args, string name, string currentText)
+        protected virtual Document CreateDocument_alt(ref Solution solution, ref Project project, DocumentCreationArgs args, string name, string initialText)
         {
             Console.WriteLine( "CreateDocument_alt() : name='" + name + "'" );
 
-            Document doc = project.AddDocument( name, currentText );
+            Document doc = project.AddDocument( name, initialText );
 
             project = doc.Project;
             solution = doc.Project.Solution;
@@ -455,8 +457,6 @@ Console.WriteLine();
             workspace.CloseDocument_fixme(documentId);
             _diagnosticsUpdatedNotifiers.TryRemove( documentId, out _ );
         }
-
-
 
         public void AddMetadataReference_alt(RoslynWorkspace workspace, ref Solution solution, ref Project project, MetadataReference mdr) {
 

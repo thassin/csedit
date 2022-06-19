@@ -35,7 +35,10 @@ namespace CsEdit.Avalonia
 {
     public partial class CsEditCodeEditorWindow : Window
     {
-        private DocumentId documentId;
+        private ProjectId _projectId;
+        private DocumentId _documentId;
+
+        private RoslynCodeEditor _editorControl;
 
         public CsEditCodeEditorWindow()
         {
@@ -56,6 +59,7 @@ namespace CsEdit.Avalonia
                 }
 
                 RoslynCodeEditor editorControl = this.FindControl<RoslynCodeEditor>("EditorXX");
+                _editorControl = editorControl;
 
                 // set the RoslynCodeEditor size = resized parent size minus margins.
 
@@ -70,41 +74,72 @@ namespace CsEdit.Avalonia
             AvaloniaXamlLoader.Load(this);
         }
 
-        public void Init( DocumentId docId, string filePath ) {
+        public void Init( ProjectId projId, DocumentId docId, string filePath ) {
 
-documentId = docId;
+            _projectId = projId;
+            _documentId = docId;
 
             Title = filePath;
 
-            RoslynHost host = CsEditWorkspace.Instance.GetHost();
+            RoslynHost host = CsEditWorkspace.Instance.GetRoslynHost();
             DocumentViewModel dvm = new DocumentViewModel( host, null );
 
-Console.WriteLine( "looking for the editor control..." );
-RoslynCodeEditor editorControl = this.FindControl<RoslynCodeEditor>("EditorXX");
+            Console.WriteLine( "looking for the editor control..." );
+            RoslynCodeEditor editorControl = this.FindControl<RoslynCodeEditor>("EditorXX");
 
-MenuItem menuItem_testItem = new MenuItem { Header = "TestItem" };
-menuItem_testItem.Click += OnMenuClick;
+            MenuItem menuItem_goToDefinition = new MenuItem { Header = "Go to Definition" };
+            menuItem_goToDefinition.Click += OnMenuClick_goToDefinition;
 
-editorControl.ContextMenu = new ContextMenu
-{
-    Items = new List<MenuItem>
-    {
-        //new MenuItem { Header = "Copy", InputGesture = new KeyGesture(Key.C, KeyModifiers.Control) },
-        //new MenuItem { Header = "Paste", InputGesture = new KeyGesture(Key.V, KeyModifiers.Control) },
-        //new MenuItem { Header = "Cut", InputGesture = new KeyGesture(Key.X, KeyModifiers.Control) }
-        menuItem_testItem
-    }
-};
+            editorControl.ContextMenu = new ContextMenu
+            {
+                Items = new List<MenuItem>
+                {
+                    // TODO these would be nice BUT ARE NOT WORKING CORRECTLY. no command specified here?
+                    //new MenuItem { Header = "Copy", InputGesture = new KeyGesture(Key.C, KeyModifiers.Control) },
+                    //new MenuItem { Header = "Paste", InputGesture = new KeyGesture(Key.V, KeyModifiers.Control) },
+                    //new MenuItem { Header = "Cut", InputGesture = new KeyGesture(Key.X, KeyModifiers.Control) },
+                    //null, // separator
 
-editorControl.DataContext = dvm;
+// see src/RoslynPad.Editor.Shared/CodeTextEditor.cs around line 70:
+                    //new MenuItem { Header = "Copy", Command = AvaloniaEdit.ApplicationCommands.Copy },
+                    //new MenuItem { Header = "Paste", Command = AvaloniaEdit.ApplicationCommands.Paste },
+                    //new MenuItem { Header = "Cut", Command = AvaloniaEdit.ApplicationCommands.Cut },
+                    //new MenuItem { Header = "FindNext", Command = AvaloniaEdit.Search.SearchCommands.FindNext, InputGesture = new KeyGesture(Key.G, KeyModifiers.Control) },
 
-OnItemLoaded( editorControl, docId) ;
+                    menuItem_goToDefinition
+                }
+            };
+
+// TODO adding a ContextMenu and using it with a right-click seems to mess up the text selection somehow???
+// => it does not matter whether there is a handler for the menu item or not (so cannot fix it there?).
+// => a workaround is to select a small stretch of text, and to use the ContextMenu only after that.
+
+            //editorControl.TextArea.RightClickMovesCaret = false; // TODO the latest versions have this???
+
+            editorControl.TextArea.Caret.PositionChanged += Caret_PositionChanged;
+
+            editorControl.DataContext = dvm;
+
+            OnItemLoaded( editorControl, docId) ;
 
         }
 
-        private void OnMenuClick(object sender, RoutedEventArgs e)
+        private void OnMenuClick_goToDefinition(object sender, RoutedEventArgs e)
         {
-            Console.WriteLine( "OnMenuClick() called!!!" );
+            RoslynCodeEditor editorControl = this.FindControl<RoslynCodeEditor>("EditorXX");
+            int caretPosition = editorControl.CaretOffset;
+
+            CsEditWorkspace.Instance.GoToDefinition( _projectId, _documentId, caretPosition );
+        }
+
+        private void Caret_PositionChanged(object sender, EventArgs e)
+        {
+/* see AvaloniaEditGIT/src/AvaloniaEdit.Demo/MainWindow.xaml
+            _statusTextBlock.Text = string.Format("Line {0} Column {1}", 
+                _textEditor.TextArea.Caret.Line,
+                _textEditor.TextArea.Caret.Column); */
+if ( _editorControl == null ) return;
+Console.WriteLine( string.Format("Line {0} Column {1}", _editorControl.TextArea.Caret.Line, _editorControl.TextArea.Caret.Column ) );
         }
 
 
@@ -112,10 +147,9 @@ OnItemLoaded( editorControl, docId) ;
         private void OnItemLoaded(RoslynCodeEditor editor, DocumentId docId)
         {
 
-            RoslynHost host = CsEditWorkspace.Instance.GetHost();
+            RoslynHost host = CsEditWorkspace.Instance.GetRoslynHost();
 
-
-Console.WriteLine( "OnItemLoaded() called!" );
+            Console.WriteLine( "OnItemLoaded() called!" );
 
             editor.Focus();
 
@@ -131,13 +165,15 @@ Console.WriteLine( "OnItemLoaded() called!" );
                 };
             }
 
-RoslynWorkspace ws = CsEditWorkspace.Instance.GetRoslynWorkspace();
+            RoslynWorkspace ws = CsEditWorkspace.Instance.GetRoslynWorkspace();
 
             string currentText = CsEditWorkspace.Instance.GetCurrentText( docId );
-
             var documentId = editor.Initialize_alt(host, ws, docId, currentText, new ClassificationHighlightColors(), out AvalonEditTextContainer container );
 
-            CsEditWorkspace.Instance.SetEditorWindowAsOpened( docId, container );
+            IDocumentModificationsTracker tracker = CsEditWorkspace.Instance.GetTracker( docId );
+            container.SetTracker( tracker );
+
+            CsEditWorkspace.Instance.SetEditorWindowAsOpened( docId, editor, container );
 
             viewModel.Initialize(documentId);
         }
@@ -148,15 +184,15 @@ RoslynWorkspace ws = CsEditWorkspace.Instance.GetRoslynWorkspace();
             Console.WriteLine( "ABOUT TO CLOSE AN EDITOR WINDOW" );
             e.Cancel = false;
 
-            RoslynHost host = CsEditWorkspace.Instance.GetHost();
+            RoslynHost host = CsEditWorkspace.Instance.GetRoslynHost();
             RoslynWorkspace ws = CsEditWorkspace.Instance.GetRoslynWorkspace();
 
-Console.WriteLine( "looking for the editor control(2)..." );
-RoslynCodeEditor editor = this.FindControl<RoslynCodeEditor>("EditorXX");
+            Console.WriteLine( "looking for the editor control(2)..." );
+            RoslynCodeEditor editor = this.FindControl<RoslynCodeEditor>("EditorXX");
 
-            editor.OnClosing( host, ws, documentId );
+            editor.OnClosing( host, ws, _documentId );
 
-            CsEditWorkspace.Instance.SetEditorWindowAsClosed( documentId );
+            CsEditWorkspace.Instance.SetEditorWindowAsClosed( _documentId );
         }
 
 

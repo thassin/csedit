@@ -13,7 +13,7 @@ namespace CsEdit.Avalonia
 {
     public partial class MainWindow : Window
     {
-        private Dictionary<DocumentId,string> allDocs = null;
+        private List<DocumentInfo> allDocs = null;
 
         public MainWindow()
         {
@@ -25,23 +25,23 @@ namespace CsEdit.Avalonia
             Console.WriteLine( "allDocs.Count = " + allDocs.Count );
 
             /* open all windows...
-            foreach( KeyValuePair<DocumentId,string> entry in allDocs ) {
+            foreach( DocumentInfo d in allDocs ) {
                 var wnd = new CsEditCodeEditorWindow();
-                wnd.Init( entry.Key, entry.Value );
+                wnd.Init( d.ProjId, d.DocId, d.FilePathRel );
                 wnd.Show();
             } */
         }
 
         private void OnButtonClick( object sender, RoutedEventArgs e )
         {
-            foreach( KeyValuePair<DocumentId,string> entry in allDocs ) {
-                if ( CsEditWorkspace.Instance.GetIsEditorWindowOpen( entry.Key ) ) continue;
+            foreach( DocumentInfo d in allDocs ) {
+                if ( CsEditWorkspace.Instance.GetIsEditorWindowOpen( d.DocId ) ) continue;
 
                 var wnd = new CsEditCodeEditorWindow();
-                wnd.Init( entry.Key, entry.Value );
+                wnd.Init( d.ProjId, d.DocId, d.FilePathRel );
                 wnd.Show();
 
-                Console.WriteLine( "Opened a new editor window : " + entry.Key.ToString() );
+                Console.WriteLine( "Opened a new editor window : " + d.DocId.ToString() );
                 return;
             }
 

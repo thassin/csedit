@@ -151,7 +151,7 @@ namespace RoslynPad.Editor
             return false;
         }
 
-        private ICommand? GetActionCommand(object action) =>
+        private ICommand? GetActionCommand(object? action) =>
             _providers.Select(provider => provider.GetActionCommand(action))
                 .FirstOrDefault(command => command != null);
 
@@ -229,12 +229,12 @@ namespace RoslynPad.Editor
 
     internal class ActionCommandConverter : IValueConverter
     {
-        public ActionCommandConverter(Func<object, ICommand?>? commandProvider) => CommandProvider = commandProvider;
+        public ActionCommandConverter(Func<object?, ICommand?>? commandProvider) => CommandProvider = commandProvider;
 
-        public Func<object, ICommand?>? CommandProvider { get; }
+        public Func<object?, ICommand?>? CommandProvider { get; }
 
-        public object? Convert(object value, Type targetType, object parameter, CultureInfo culture) => CommandProvider?.Invoke(value);
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => CommandProvider?.Invoke(value);
 
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotSupportedException();
     }
 }

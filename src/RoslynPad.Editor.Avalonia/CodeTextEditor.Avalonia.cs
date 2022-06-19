@@ -56,18 +56,23 @@ namespace RoslynPad.Editor
                 CompletionList.ListBox.PointerPressed +=
                     (o, e) => _isSoftSelectionActive = false;
 
+                // see AvaloniaEdit/CodeCompletion/CompletionWindowBase.cs line 88...
+                PlacementTarget = TextArea.TextView;
+                PlacementMode = PlacementMode.Pointer;
+
+                // 20220617 setting PlacementMode.Pointer here seems to fix the CustomCompletionWindow positioning.
+                // => add similar fix to OverloadInsightWindow initialization, see CodeTextEdtor.cs around line 350.
 
 
-// see AvaloniaEdit/CodeCompletion/CompletionWindowBase.cs line 88...
-            PlacementTarget = TextArea.TextView;
-            //PlacementMode = PlacementMode.AnchorAndGravity;
-            PlacementMode = PlacementMode.Pointer;
-            //PlacementAnchor = Avalonia.Controls.Primitives.PopupPositioning.PopupAnchor.TopLeft;
-            //PlacementGravity = Avalonia.Controls.Primitives.PopupPositioning.PopupGravity.BottomRight;
+
+// not working or not needed...
+//PlacementMode = PlacementMode.AnchorAndGravity;
+//PlacementAnchor = Avalonia.Controls.Primitives.PopupPositioning.PopupAnchor.TopLeft;
+//PlacementGravity = Avalonia.Controls.Primitives.PopupPositioning.PopupGravity.BottomRight;
 
 // see AvaloniaEdit/CodeCompletion/CompletionWindowBase.cs line 115...
-                //SetPosition(TextArea.Caret.Position); // not needed?
-                //UpdatePosition(); // not needed?
+//SetPosition(TextArea.Caret.Position); // not needed?
+//UpdatePosition(); // not needed?
 
 
 

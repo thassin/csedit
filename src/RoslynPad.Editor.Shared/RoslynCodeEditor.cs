@@ -238,11 +238,14 @@ roslynHost.OpenDocument_alt( workspace, docId, avalonEditTextContainer,
         {
             if (_braceMatcherHighlighter == null) return;
 
+Console.WriteLine( "TryJumpToBrace start" );
+
             var caret = CaretOffset;
 
             if (TryJumpToPosition(_braceMatcherHighlighter.LeftOfPosition, caret) ||
                 TryJumpToPosition(_braceMatcherHighlighter.RightOfPosition, caret))
             {
+Console.WriteLine( "TryJumpToBrace ScrollToLine " + TextArea.Caret.Line );
                 ScrollToLine(TextArea.Caret.Line);
             }
         }
@@ -372,13 +375,21 @@ roslynHost.OpenDocument_alt( workspace, docId, avalonEditTextContainer,
 
         protected override void OnKeyDown(KeyEventArgs e)
         {
+
+Console.WriteLine( "RCE.OnKeyDown() : " + e.Key + " " + e.HasModifiers(ModifierKeys.Control) );
+
             base.OnKeyDown(e);
+
+// TODO add CTRL-S => save the file to filesystem?
 
             if (e.HasModifiers(ModifierKeys.Control))
             {
                 switch (e.Key)
                 {
+// TODO what is this button? what about going to open/close position? pageup/down???
                     case Key.OemCloseBrackets:
+                    case Key.B:
+Console.WriteLine( "TryJumpToBrace" );
                         TryJumpToBrace();
                         break;
                 }

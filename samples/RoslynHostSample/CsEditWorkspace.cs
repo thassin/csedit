@@ -15,7 +15,7 @@ using RoslynPad.Editor; // AvalonEditTextContainer
 using RoslynPad.Roslyn; // RoslynHost
 using RoslynPad.Roslyn.Diagnostics; // DiagnosticsUpdatedArgs
 
-namespace CsEdit.Avalonia
+namespace RoslynHostSample
 {
     public class DocumentInfo {
         public ProjectId ProjId;
@@ -28,8 +28,8 @@ namespace CsEdit.Avalonia
         private List<ProjectDescriptor_p> _projects; // TODO should this be a dictionary<projectid,PD>???
         private RoslynHost _host;
 
-        private RoslynWorkspace _ws;
-        private Solution _sol;
+        private RoslynWorkspace ws;
+        private Solution sol;
 
         #region singleton
 
@@ -89,12 +89,12 @@ namespace CsEdit.Avalonia
 
             Console.WriteLine("creating workspace/solution");
 
-            _ws = _host.CreateWorkspace();
-            _sol = _ws.CurrentSolution;
+            ws = _host.CreateWorkspace();
+            sol = ws.CurrentSolution;
 
-            _host.AddAnalyzerReferences( _ws, ref _sol );
+            _host.AddAnalyzerReferences(ws, ref sol);
 
-            CompilationOptions compilationOptions = _host.CreateCompilationOptions_alt( "/tmp/testvalue", true );
+            CompilationOptions compilationOptions = _host.CreateCompilationOptions_alt("/tmp/testvalue", true);
 
             int testCase = 3; // a simple switch to test few different scenarios.
 
@@ -193,7 +193,7 @@ namespace CsEdit.Avalonia
                 Console.WriteLine();
                 Console.WriteLine("creating the project");
 
-                ProjectId projectId = x.CreateProject( _host, _ws, ref _sol, compilationOptions, projectReferences );
+                ProjectId projectId = x.CreateProject(_host, ws, ref sol, compilationOptions, projectReferences);
             }
 
             // since the Solution and Project objects are immutable, various operations will
@@ -201,15 +201,79 @@ namespace CsEdit.Avalonia
             // => always keep an up-to-date version of the Solution instance.
             // => avoid keeping Project objects, prefer getting fresh Project objects from Solution (using ProjectId).
 
-            DumpSolutionContents( _sol );
+            DumpSolutionContents( sol );
 
-            Console.WriteLine();
-            Console.WriteLine( "solution setup is now READY." );
-            Console.WriteLine();
+            int testOperation = 1;
 
-            //Console.WriteLine("remove the workspace");
-            //_host.CloseWorkspace( ws );
-            //Console.WriteLine("COMPLETED!");
+            if ( testOperation == 1 ) {
+
+                // wait for feedback...
+
+                Console.WriteLine();
+                Console.WriteLine( "solution setup is now READY => waiting for feedback..." );
+                Console.WriteLine();
+
+                Thread.Sleep(60000);
+
+            } else {
+
+                // query semantic info.
+                // => we can ask a Compilation representing each of the Projects separately.
+		// => then query each Compilation/SyntaxTree separately?
+
+                foreach ( ProjectDescriptor_p x in _projects ) {
+
+                    CSharpCompilation comp = (CSharpCompilation) sol.GetProject( x.GetProjectId() ).GetCompilationAsync().GetAwaiter().GetResult();
+
+// https://docs.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/get-started/semantic-analysis 
+
+                    int treeCount = 0;
+                    foreach ( var tree in comp.SyntaxTrees ) {
+                        treeCount++;
+
+                        CompilationUnitSyntax root = tree.GetCompilationUnitRoot();
+
+// https://docs.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/get-started/syntax-analysis
+                        Console.WriteLine($"The tree is a {root.Kind()} node.");
+                        Console.WriteLine($"The tree has {root.Members.Count} elements in it.");
+                        Console.WriteLine($"The tree has {root.Usings.Count} using statements. They are:");
+                        foreach (UsingDirectiveSyntax element in root.Usings) Console.WriteLine($"\t{element.Name}");
+
+                        try {
+
+                            int caretPosition = 216;
+                            SyntaxToken tok = root.FindToken( caretPosition, false );
+                            Console.WriteLine( "token in position " + caretPosition + " is " + tok.GetType() + " : '" + tok.Text + "'" );
+
+                            SemanticModel model = comp.GetSemanticModel(tree);
+
+                            SyntaxNode sn = tok.Parent;
+                            if ( sn == null ) {
+                                Console.WriteLine( "  =>  NO RESULT..." );
+                            } else {
+                                SymbolInfo si = model.GetSymbolInfo( sn );
+                                Console.WriteLine( "  =>  SymbolInfo FOUND." );
+
+// https://docs.microsoft.com/en-us/dotnet/api/microsoft.codeanalysis.isymbol?view=roslyn-dotnet-4.2.0
+                                ISymbol s = si.Symbol;
+                                if ( s != null ) {
+                                    Console.WriteLine( "    =>    Symbol.Name=" + s.Name );
+                                    foreach ( var l in s.Locations ) Console.WriteLine( "    =>    Symbol.Location=" + l );
+                                }
+                            }
+
+                        } catch ( Exception e ) {
+                            Console.WriteLine( "  =>  Exception: " + e );
+                        }
+                    }
+                    Console.WriteLine( "treeCount=" + treeCount );
+
+                } // foreach-END-OF
+            }
+
+            Console.WriteLine("remove the workspace");
+            _host.CloseWorkspace( ws );
+            Console.WriteLine("COMPLETED!");
         }
 
         internal RoslynHost GetRoslynHost() {
@@ -217,7 +281,7 @@ namespace CsEdit.Avalonia
         }
 
         internal RoslynWorkspace GetRoslynWorkspace() {
-            return _ws;
+            return ws;
         }
 
         public List<DocumentInfo> GetAllDocuments() {
@@ -248,7 +312,7 @@ namespace CsEdit.Avalonia
 // TODO GetCurrentTextFromDocumentObject??
 // TODO GetCurrentTextFromDocumentObject??
         public string GetCurrentText( DocumentId docId ) {
-            Document d = _sol.GetDocument( docId );
+            Document d = sol.GetDocument( docId );
             if ( d != null ) {
                 // get the current text directly from Roslyn Document object.
                 SourceText st = d.GetTextAsync( CancellationToken.None ).GetAwaiter().GetResult();
@@ -290,13 +354,11 @@ namespace CsEdit.Avalonia
                         continue;
                     }
 
-                    Document doc = _sol.GetProject( projId ).GetDocument( docId );
+                    Document doc = sol.GetProject( projId ).GetDocument( docId );
                     doc = doc.WithText( GetCurrentTextFromContainer( docId ) );
                     di.ResetTextModificationCount();
 
-                    // solution is updated?
-                    // the same is for project, but we don't use it here.
-                    _sol = doc.Project.Solution;
+                    sol = doc.Project.Solution; // solution is updated? so is project.
 
                     Console.WriteLine( "SyncAllModifiedContainersToDocuments() : updated : " + entry.Key );
 
@@ -397,7 +459,7 @@ namespace CsEdit.Avalonia
             SyncModifiedContainersToDocuments( null );
 
             // write the current text from Roslyn Document object to console (just a debug step).
-            Document doc = _sol.GetProject( projId ).GetDocument( docId );
+            Document doc = sol.GetProject( projId ).GetDocument( docId );
             string txt = GetCurrentText( docId );
             Console.WriteLine( txt );
 
@@ -571,6 +633,12 @@ namespace CsEdit.Avalonia
 
                 DocumentInfo_p docInfo = new DocumentInfo_p( d_Id, srcFilePath );
                 docInfoDict.Add( d_Id, docInfo );
+
+                // open the document now, in order to get feedback...
+
+                AvaloniaEdit.Document.TextDocument d = new AvaloniaEdit.Document.TextDocument( initialText );
+                AvalonEditTextContainer c = new AvalonEditTextContainer( d );
+                host.OpenDocument_alt( ws, d_Id, c, PrintFeedback, null );
             }
 
             return pId;

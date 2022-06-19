@@ -16,10 +16,16 @@ using RoslynPad.Roslyn;
 
 namespace RoslynPad.Editor
 {
+    public interface IDocumentModificationsTracker {
+        void DocumentModified();
+    }
+
     public sealed class AvalonEditTextContainer : SourceTextContainer, IEditorCaretProvider, IDisposable
     {
         private SourceText _currentText;
         private bool _updatding;
+
+        private IDocumentModificationsTracker? _tracker;
 
         public TextDocument Document { get; }
 
@@ -43,12 +49,20 @@ namespace RoslynPad.Editor
             Document.Changed -= DocumentOnChanged;
         }
 
+        public void SetTracker( IDocumentModificationsTracker tracker ) {
+            _tracker = tracker;
+        }
+
         private void DocumentOnChanged(object? sender, DocumentChangeEventArgs e)
         {
 
 Console.WriteLine( "AETC.DocumentOnChanged -> forward the text modifications" );
+// NOTICE the code below does NOT automatically update the Roslyn Project/Document objects.
+// => see CsEditWorkspace.SyncModifiedContainersToDocuments()...
 
             if (_updatding) return;
+
+            if ( _tracker != null ) _tracker.DocumentModified();
 
             var oldText = _currentText;
 

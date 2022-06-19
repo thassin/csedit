@@ -56,7 +56,7 @@ namespace RoslynPad.Editor
                     .SelectMany(x => x.Actions));
         }
 
-        public ICommand? GetActionCommand(object action)
+        public ICommand? GetActionCommand(object? action)
         {
             if (action is CodeAction codeAction)
             {

@@ -120,8 +120,19 @@ namespace RoslynPad.Editor
 
         protected override void OnKeyDown(KeyEventArgs e)
         {
+
+// most of the keypresses do NOT reach this stage. for example:
+//^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+// CTRL-Z => undo
+// CTRL-F => find
+// CTRL-X => cut
+// CTRL-C => copy
+// CTRL-V => paste
+Console.WriteLine( "CET.OnKeyDown() : " + e.Key + " " + e.HasModifiers(ModifierKeys.Control) );
+
             base.OnKeyDown(e);
 
+// CTRL-space will open the completions-dialog...
             if (e.Key == Key.Space && e.HasModifiers(ModifierKeys.Control))
             {
                 e.Handled = true;
@@ -129,6 +140,24 @@ namespace RoslynPad.Editor
                     ? TriggerMode.SignatureHelp
                     : TriggerMode.Completion;
                 _ = ShowCompletion(mode);
+            }
+
+// TODO how to set CTRL-G as an alias to "F3" (find next)???
+// TODO how to set CTRL-G as an alias to "F3" (find next)???
+// TODO how to set CTRL-G as an alias to "F3" (find next)???
+            if (e.Key == Key.G && e.HasModifiers(ModifierKeys.Control))
+            {
+
+// there should exist: SearchPanel TextEditor.SearchPanel ???
+// => 20220616 git-version at least has it (and a corresponding private field).
+
+
+
+Console.WriteLine( "findnext execute..." ); // THE BELOW STUFF IS NOT YET WORKING...
+//Console.WriteLine( "findnext CANexecute=" + AvaloniaEdit.Search.SearchCommands.FindNext.CanExecute( null, null ) );
+//Console.WriteLine( "findnext CANexecute=" + base.SearchPanel.FindNext() );
+//AvaloniaEdit.Search.SearchCommands.FindNext.Execute( null, null );
+//AvaloniaEdit.Search.SearchCommands.FindNext.Execute( this, e );
             }
         }
 
@@ -299,8 +328,16 @@ namespace RoslynPad.Editor
                     {
                         Provider = results.OverloadProvider,
                         //Background = CompletionBackground,
+
+                        // 20220617 added here a similar fix as in CodeTextEditor.CustomCompletionWindow.Initialize().
+                        // => this will align the OverloadInsightWindow just below the edited section of the text.
+
+                        PlacementTarget = TextArea.TextView,
+                        PlacementMode = PlacementMode.Pointer,
+
                     };
 
+                    // is this method missing? only a "partial" declation exists?
                     InitializeInsightWindow();
 
                     _insightWindow.Closed += (o, args) => _insightWindow = null;
