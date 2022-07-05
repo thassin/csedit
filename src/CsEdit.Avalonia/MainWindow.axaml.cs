@@ -13,7 +13,7 @@ namespace CsEdit.Avalonia
 {
     public partial class MainWindow : Window
     {
-        private List<DocumentInfo> allDocs = null;
+        private List<DocumentDescriptor> allDocs = null;
 
         public MainWindow()
         {
@@ -25,23 +25,23 @@ namespace CsEdit.Avalonia
             Console.WriteLine( "allDocs.Count = " + allDocs.Count );
 
             /* open all windows...
-            foreach( DocumentInfo d in allDocs ) {
+            foreach( DocumentDescriptor dd in allDocs ) {
                 var wnd = new CsEditCodeEditorWindow();
-                wnd.Init( d.ProjId, d.DocId, d.FilePathRel );
+                wnd.Init( dd.ProjectId, dd.DocumentId, dd.FilePathUniq );
                 wnd.Show();
             } */
         }
 
         private void OnButtonClick( object sender, RoutedEventArgs e )
         {
-            foreach( DocumentInfo d in allDocs ) {
-                if ( CsEditWorkspace.Instance.GetIsEditorWindowOpen( d.DocId ) ) continue;
+            foreach( DocumentDescriptor dd in allDocs ) {
+                if ( CsEditWorkspace.Instance.GetIsEditorWindowOpen( dd.DocumentId ) ) continue;
 
                 var wnd = new CsEditCodeEditorWindow();
-                wnd.Init( d.ProjId, d.DocId, d.FilePathRel );
+                wnd.Init( dd.ProjectId, dd.DocumentId, dd.FilePathUniq );
                 wnd.Show();
 
-                Console.WriteLine( "Opened a new editor window : " + d.DocId.ToString() );
+                Console.WriteLine( "Opened a new editor window : " + dd.DocumentId.ToString() );
                 return;
             }
 
@@ -54,7 +54,5 @@ namespace CsEdit.Avalonia
             Console.WriteLine( "CLOSING A WINDOW..." );
             //e.Cancel = false;
         }
-
-
     }
 }
