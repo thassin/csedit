@@ -5,6 +5,8 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Interactivity; // RoutedEventArgs
 using Avalonia.Input; // KeyEventArgs
 
+using Avalonia.Media; // SolidColorBrush
+
 using Microsoft.CodeAnalysis; // SourceCodeKind etc
 using Microsoft.CodeAnalysis.CSharp; // LanguageVersion etc
 using Microsoft.CodeAnalysis.Text; // SourceTextContainer etc
@@ -86,6 +88,10 @@ namespace CsEdit.Avalonia
 
             Console.WriteLine( "looking for the editor control..." );
             RoslynCodeEditor editorControl = this.FindControl<RoslynCodeEditor>("EditorXX");
+
+            // 20220709 change the default text color, when no specific syntax highlighting is used.
+            // => in FluentTheme "Light" mode the default color is too light, making text poorly readable.
+            editorControl.Foreground = new SolidColorBrush( Color.FromRgb( 0x40, 0x40, 0x40 ) ); // default is D4.
 
             MenuItem menuItem_goToDefinition = new MenuItem { Header = "Go to Definition" };
             menuItem_goToDefinition.Click += OnMenuClick_goToDefinition;

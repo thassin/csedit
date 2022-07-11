@@ -18,7 +18,9 @@ namespace RoslynPad.Roslyn
         /// <summary>
         /// Returns namespace-only (no assemblies) defaults that fit all frameworks.
         /// </summary>
-        public static RoslynHostReferences NamespaceDefault { get; } = Empty.With(imports: new[]{
+        public static RoslynHostReferences NamespaceDefault { get; } = Empty;
+        /* why these? also see src/CsEdit.Avalonia/CsEditWorkspace.cs about "assemblyReferences"?
+        .With(imports: new[]{
             "System",
             "System.Threading",
             "System.Threading.Tasks",
@@ -29,7 +31,7 @@ namespace RoslynPad.Roslyn
             "System.Linq",
             "System.IO",
             "System.Reflection",
-        });
+        }); */
 
         public RoslynHostReferences With(IEnumerable<MetadataReference>? references = null, IEnumerable<string>? imports = null,
             IEnumerable<Assembly>? assemblyReferences = null, IEnumerable<string>? assemblyPathReferences = null, IEnumerable<Type>? typeNamespaceImports = null)

@@ -48,7 +48,8 @@ namespace RoslynPad.Editor
             Options = new TextEditorOptions
             {
                 ConvertTabsToSpaces = true,
-                AllowScrollBelowDocument = true,
+                //AllowScrollBelowDocument = true,
+                AllowScrollBelowDocument = false, // 20220709
                 IndentationSize = 4,
                 EnableEmailHyperlinks = false,
             };
@@ -78,6 +79,19 @@ namespace RoslynPad.Editor
 
             Console.WriteLine( "setup SyntaxHighlighting (using extension .cs)" );
             SyntaxHighlighting = HighlightingManager.Instance.GetDefinitionByExtension(".cs");
+
+// need to change the colors???
+// https://stackoverflow.com/questions/37395626/how-can-i-programmatically-change-the-default-colors-in-avaloneditor-for-c-sharp 
+// https://github.com/icsharpcode/AvalonEdit/blob/master/ICSharpCode.AvalonEdit/Highlighting/Resources/CSharp-Mode.xshd 
+
+//var commentHighlighting = SyntaxHighlighting.NamedHighlightingColors.First( c => c.Name == "Comment" );
+//commentHighlighting.Foreground = new SimpleHighlightingBrush( Colors.Red ); // Color.FromRgb( 0xC0, 0xC0, 0xC0 )
+
+// also the "default color", when used when no specific rules are applied, needs to be adjusted.
+// https://stackoverflow.com/questions/25771201/avalonedit-default-color-when-no-rules-are-matched 
+// the trick of changing the editor's "Foreground" property, works but it must be done elsewhere.
+// see CsEditCodeEditorWindow.axaml.cs around line 95.
+
         }
 
         partial void Initialize();

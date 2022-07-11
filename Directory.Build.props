@@ -18,7 +18,7 @@
     <AvaloniaVersion>0.10.12</AvaloniaVersion>
     <AvaloniaEditVersion>0.10.12.2</AvaloniaEditVersion>
 
-    <DotNetVersion>[6.0.*,6.0.0]</DotNetVersion>
+    <DotNetVersion>6.0.0</DotNetVersion>
     <RxVersion>5.0.0</RxVersion>
     <LangVersion>9.0</LangVersion>
     <Nullable>Enable</Nullable>

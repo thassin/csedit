@@ -23,22 +23,28 @@ namespace CsEdit.Avalonia {
         public string TargetFramework { get; private set; }
 
         public string[] SourceFiles { get; private set; }
-        public string[] LibraryFiles { get; private set; }
-        public string[] ProjectReferences { get; private set; }
 
-        public ProjectDescriptor( string name, string target, string[] src, string[] lib, string[] pr ) {
+        public string[] LibraryFiles { get; private set; }
+
+        public string[] ProjectReferences { get; private set; }
+        public Dictionary<string,string> PackageReferences { get; private set; }
+
+        public ProjectDescriptor( string name, string target, string[] srcFiles, string[] projRefs, Dictionary<string,string> pkgRefs ) {
 
             ProjectNameUniq = name;
             TargetFramework = target;
 
-            // set an empty array if null given.
-            if ( src == null ) src = new string[] { };
-            if ( lib == null ) lib = new string[] { };
-            if ( pr == null ) pr = new string[] { };
+            // libraries are set in a later step...
+            LibraryFiles = null;
 
-            SourceFiles = src;
-            LibraryFiles = lib;
-            ProjectReferences = pr;
+            SourceFiles = srcFiles;
+            ProjectReferences = projRefs;
+            PackageReferences = pkgRefs;
+        }
+
+        public void SetLibraries( string[] libFiles ) {
+            if ( LibraryFiles != null ) throw new Exception( "libraries are set already!" );
+            LibraryFiles = libFiles;
         }
     }
 
@@ -53,17 +59,27 @@ namespace CsEdit.Avalonia {
     // https://docs.microsoft.com/en-us/aspnet/web-forms/overview/deployment/web-deployment-in-the-enterprise/understanding-the-project-file 
     // https://natemcmaster.com/blog/2017/03/09/vs2015-to-vs2017-upgrade/ 
 
+    //public ProjectReaderResult {
+    public class RuntimeConfig {
+        public string Runtime;
+        public string TargetFramework;
+        public LanguageVersion LanguageVersion;
+        public bool NullableReferenceTypes;
+    }
+
     public interface IProjectReader {
-        bool TryRead( string dirPathRel, List<ProjectDescriptor> pList );
+        bool TryRead( string dirPathRel, List<ProjectDescriptor> pList, out RuntimeConfig cfg );
     }
 
     public static class ProjectsProvider {
 
         public static string WorkingDirectory { get; private set; }
+        public static RuntimeConfig RuntimeConfig { get; private set; }
         public static List<ProjectDescriptor> Projects { get; private set; }
 
         static ProjectsProvider() {
             WorkingDirectory = null;
+            RuntimeConfig = null;
             Projects = null;
         }
 
@@ -104,8 +120,9 @@ namespace CsEdit.Avalonia {
 
             foreach ( IProjectReader reader in readers ) {
 
-                if ( reader.TryRead( ".", Projects ) ) {
+                if ( reader.TryRead( ".", Projects, out RuntimeConfig cfg ) ) {
                     // if any of the readers report success, then leave the reader loop.
+                    RuntimeConfig = cfg;
                     break;
                 }
 
@@ -167,11 +184,7 @@ namespace CsEdit.Avalonia {
             get {
                 lock ( _instanceLock ) {
                     if ( _instance == null ) {
-
-
                         _instance = new CsEditWorkspace();
-
-                        //_instance.Init_demo();
                         _instance.Init();
                     }
                     return _instance;
@@ -180,222 +193,28 @@ namespace CsEdit.Avalonia {
         }
 
         private CsEditWorkspace() {
-            // NOTICE the methods Init...() will access the Instance property,
+            // NOTICE the method Init() will access the Instance property,
             // so calling it directly from here would cause an infinite loop.
         }
 
         #endregion // singleton
 
-        private void Init_demo() {
-            Console.WriteLine("Init_demo() starting");
-
-            string wrkdir = ProjectsProvider.WorkingDirectory;
-            if ( wrkdir != Environment.CurrentDirectory ) throw new Exception( "WorkingDirectory is not valid! It must be \".\" for a demo initialization." );
-
-            _host = new RoslynHost(LanguageVersion.CSharp7,
-            additionalAssemblies: new[]
-            {
-                //Assembly.Load("RoslynPad.Roslyn.Windows"),
-                //Assembly.Load("RoslynPad.Editor.Windows")
-
-                // read these extra MEF components etc...
-                Assembly.Load("RoslynPad.Roslyn.Avalonia"),
-                Assembly.Load("RoslynPad.Editor.Avalonia")
-
-            }, RoslynHostReferences.NamespaceDefault.With(assemblyReferences: new[]
-            {
-                typeof(object).Assembly,
-
-                // TODO are all these relevant?
-                // TODO need to add something more here?
-
-                typeof(System.Text.RegularExpressions.Regex).Assembly,
-                typeof(System.Linq.Enumerable).Assembly,
-            }));
-
-            Console.WriteLine("RoslynHost created");
-
-            //string libPath = "/usr/share/dotnet/shared/Microsoft.NETCore.App/6.0.5";
-            string libPath = "/usr/share/dotnet/shared/Microsoft.NETCore.App/6.0.6";
-            Console.WriteLine("using libPath: " + libPath);
-
-            Console.WriteLine("creating workspace/solution");
-
-            _ws = _host.CreateWorkspace();
-            _sol = _ws.CurrentSolution;
-
-            _host.AddAnalyzerReferences( _ws, ref _sol );
-
-            CompilationOptions compilationOptions = _host.CreateCompilationOptions_alt( "/tmp/testvalue", true );
-
-            _projects = new List<ProjectInfo_p>();
-
-            int testCase = 3; // a simple switch to test few different scenarios.
-
-            // TODO how to deal with directory separators?
-            // => see Path.DirectorySeparatorChar
-
-            string[] src;
-            string[] lib;
-            string[] pr;
-
-            ProjectDescriptor pd;
-            string target = "netcoreapp3.1";
-
-            if ( testCase == 1 ) {
-
-                // create a single project with 2 separate files.
-
-                src = new string[] {
-                    "SampleFiles/ClassA.cs",
-                    "SampleFiles/ClassB.cs"
-                };
-
-                lib = new string[] {
-                    "System.Runtime.dll",
-                    "System.Console.dll"
-                };
-
-                pd = new ProjectDescriptor( "singleproject", target, src, lib, null );
-                _projects.Add( new ProjectInfo_p( pd, libPath ) );
-
-            } else if ( testCase == 2 ) {
-
-                // create two separate projects with one source file in each,
-                // and make the 2nd project use the 1st one using a reference.
-
-                src = new string[] {
-                    "SampleFiles/ClassA.cs"
-                };
-
-                lib = new string[] {
-                    "System.Runtime.dll",
-                    "System.Console.dll"
-                };
-
-                pd = new ProjectDescriptor( "firstproject", target, src, lib, null );
-                _projects.Add( new ProjectInfo_p( pd, libPath ) );
-
-                src = new string[] {
-                    "SampleFiles/ClassB.cs"
-                };
-
-                lib = new string[] {
-                    "System.Runtime.dll"
-                };
-
-                pr = new string[] {
-                    "firstproject"
-                };
-
-                pd = new ProjectDescriptor( "secondproject", target, src, lib, pr );
-                _projects.Add( new ProjectInfo_p( pd, libPath ) );
-
-            } else if ( testCase == 3 ) {
-
-                // create two separate projects with 1 + 2 source files,
-                // and make the 2nd project use the 1st one using a reference.
-
-                src = new string[] {
-                    "SampleFiles/ClassC1.cs",
-                    "SampleFiles/ClassC2.cs"
-                };
-
-                lib = new string[] {
-                    "System.Runtime.dll",
-                    "System.Console.dll"
-                };
-
-                pd = new ProjectDescriptor( "firstproject", target, src, lib, null );
-                _projects.Add( new ProjectInfo_p( pd, libPath ) );
-
-                src = new string[] {
-                    "SampleFiles/ClassD.cs"
-                };
-
-                lib = new string[] {
-                    "System.Runtime.dll"
-                };
-
-                pr = new string[] {
-                    "firstproject"
-                };
-
-                pd = new ProjectDescriptor( "secondproject", target, src, lib, pr );
-                _projects.Add( new ProjectInfo_p( pd, libPath ) );
-
-            } else {
-                Console.WriteLine( "ERROR testCase not implemented: " + testCase );
-                return;
-            }
-
-            // IMPORTANT! it seems thet the project tree must be built from ground-up.
-            // giving all project references as parameters to project-creation step.
-            // => trying to add the references afterwards does not work.
-
-            // TODO the projects are not yet sorted based on dependencies.
-            // TODO how to detect cyclic dependencies (correctly?).
-
-            foreach ( ProjectInfo_p x in _projects ) {
-
-                Console.WriteLine();
-                Console.Write("the project \"" + x.desc.ProjectNameUniq + "\" contains ");
-                Console.Write(x.desc.SourceFiles.Length + " source files and ");
-                Console.Write(x.desc.LibraryFiles.Length + " library files.");
-                Console.WriteLine();
-
-                List<ProjectReference> projectReferences = new List<ProjectReference>();
-
-                foreach ( string projName in x.desc.ProjectReferences ) {
-
-                    ProjectId pId = null;
-                    foreach ( ProjectInfo_p y in _projects ) {
-                        if ( y.desc.ProjectNameUniq != projName ) continue;
-                        pId = y.GetProjectId();
-                    }
-
-                    if ( pId == null ) {
-                        Console.WriteLine( "ERROR project not found: " + projName );
-                        return;
-                    }
-
-                    Console.WriteLine( "  =>  adding project reference: " + x.desc.ProjectNameUniq + " => " + projName );
-
-                    ProjectReference pref = new ProjectReference( pId );
-                    projectReferences.Add( pref );
-                }
-
-                Console.WriteLine();
-                Console.WriteLine("creating the project");
-
-                ProjectId projectId = x.CreateProject( _host, _ws, ref _sol, compilationOptions, projectReferences );
-            }
-
-            // since the Solution and Project objects are immutable, various operations will
-            // generate updated objects, and therefore existing objects can become obsoleted.
-            // => always keep an up-to-date version of the Solution instance.
-            // => avoid keeping Project objects, prefer getting fresh Project objects from Solution (using ProjectId).
-
-            DumpSolutionContents( _sol );
-
-            Console.WriteLine();
-            Console.WriteLine( "solution setup is now READY." );
-            Console.WriteLine();
-
-            //Console.WriteLine("remove the workspace");
-            //_host.CloseWorkspace( ws );
-            //Console.WriteLine("COMPLETED!");
-        }
-
         private void Init() {
-            Console.WriteLine("Init() starting");
+            Console.WriteLine( "Init() starting" );
 
             string wrkdir = ProjectsProvider.WorkingDirectory;
             if ( string.IsNullOrWhiteSpace( wrkdir ) ) throw new Exception( "WorkingDirectory is not valid!" );
 
             // ProjectsProvider.Projects should exist now, and contain project(s) with at least one src-file.
 
-            _host = new RoslynHost(LanguageVersion.CSharp7,
+            string runtime = ProjectsProvider.RuntimeConfig.Runtime;
+            string targetFramework = ProjectsProvider.RuntimeConfig.TargetFramework;
+
+            Console.WriteLine( "Init() runtime=" + runtime );
+            Console.WriteLine( "Init() targetFramework=" + targetFramework );
+            Console.WriteLine( "Init() langVersion=" + ProjectsProvider.RuntimeConfig.LanguageVersion );
+
+            _host = new RoslynHost( ProjectsProvider.RuntimeConfig.LanguageVersion,
             additionalAssemblies: new[]
             {
                 //Assembly.Load("RoslynPad.Roslyn.Windows"),
@@ -405,25 +224,34 @@ namespace CsEdit.Avalonia {
                 Assembly.Load("RoslynPad.Roslyn.Avalonia"),
                 Assembly.Load("RoslynPad.Editor.Avalonia")
 
-            }, RoslynHostReferences.NamespaceDefault.With(assemblyReferences: new[]
+            }, RoslynHostReferences.NamespaceDefault
+            /* skip... also see src/RoslynPad.Roslyn/RoslynHostReferences.cs about namespaces?
+            .With(assemblyReferences: new[]
             {
-                typeof(object).Assembly,
 
                 // TODO are all these relevant?
                 // TODO need to add something more here?
 
-                typeof(System.Text.RegularExpressions.Regex).Assembly,
-                typeof(System.Linq.Enumerable).Assembly,
-            }));
+                // do not add any fixed assemblies here.
+                // there is the mono/dotnetSKD issue (and maybe more version issues)?
 
-            Console.WriteLine("RoslynHost created");
-            Console.WriteLine("creating workspace/solution");
+                //typeof(object).Assembly,
+                //typeof(System.Text.RegularExpressions.Regex).Assembly,
+                //typeof(System.Linq.Enumerable).Assembly,
+            }) */
+            );
+
+            Console.WriteLine( "RoslynHost created" );
+            Console.WriteLine( "creating workspace/solution" );
 
             _ws = _host.CreateWorkspace();
             _sol = _ws.CurrentSolution;
 
             _host.AddAnalyzerReferences( _ws, ref _sol );
 
+// TODO the first parameter is not used???
+// TODO the first parameter is not used???
+// TODO the first parameter is not used???
             CompilationOptions compilationOptions = _host.CreateCompilationOptions_alt( "/tmp/testvalue", true );
 
             _projects = new List<ProjectInfo_p>();
@@ -434,29 +262,7 @@ namespace CsEdit.Avalonia {
                 Console.WriteLine( "CREATING PROJECT: " + pd.ProjectNameUniq + " for " + pd.TargetFramework );
                 Console.WriteLine();
 
-                string libPath = null;
-                if ( pd.TargetFramework == "netcoreapp3.1" ) {
-                    libPath = "/usr/share/dotnet/shared/Microsoft.NETCore.App/3.1.26";
-                }
-                if ( pd.TargetFramework == "net6.0" ) {
-                    libPath = "/usr/share/dotnet/shared/Microsoft.NETCore.App/6.0.6";
-                }
-
-                if ( pd.TargetFramework == "netstandard2.0" ) {
-                    libPath = "/home/tommi/.nuget/packages/netstandard.library/2.0.3/build/netstandard2.0/ref";
-                }
-
-                // also see NewVsProjectFileReader.cs method GetDllPath() around line 440.
-                if ( libPath == null || Directory.Exists( libPath ) == false ) {
-                    Console.WriteLine();
-                    Console.WriteLine( "ERROR when creating project: " + pd.ProjectNameUniq );
-                    Console.WriteLine( "  =>  could not find library path for TargetFramework '" + pd.TargetFramework + "'." );
-                    Console.WriteLine( "  =>  see CsEditFramework.cs around line 500 and check the paths in your local system." );
-                    Console.WriteLine();
-                    throw new Exception( "libPath not found" );
-                }
-
-                _projects.Add( new ProjectInfo_p( pd, libPath ) );
+                _projects.Add( new ProjectInfo_p( pd ) );
             }
 
             // IMPORTANT! it seems thet the project tree must be built from ground-up.
@@ -496,7 +302,7 @@ namespace CsEdit.Avalonia {
                 }
 
                 Console.WriteLine();
-                Console.WriteLine("creating the project");
+                Console.WriteLine( "creating the project: " + x.desc.ProjectNameUniq );
 
                 ProjectId projectId = x.CreateProject( _host, _ws, ref _sol, compilationOptions, projectReferences );
             }
@@ -512,9 +318,9 @@ namespace CsEdit.Avalonia {
             Console.WriteLine( "solution setup is now READY." );
             Console.WriteLine();
 
-            //Console.WriteLine("remove the workspace");
+            //Console.WriteLine( "remove the workspace" );
             //_host.CloseWorkspace( ws );
-            //Console.WriteLine("COMPLETED!");
+            //Console.WriteLine( "COMPLETED!" );
         }
 
         internal RoslynHost GetRoslynHost() {
@@ -799,7 +605,9 @@ namespace CsEdit.Avalonia {
                     Console.WriteLine( "        Assembly " + a.Display );
                 }
                 foreach ( var x in p.ProjectReferences ) {
-                    Console.WriteLine( "        ProjectReference " + x.ToString() );
+                    string name1 = p.Name;
+                    string name2 = sol.GetProject( x.ProjectId ).Name;
+                    Console.WriteLine( "        ProjectReference " + name1 + " => " + name2 );
                 }
                 foreach ( var d in p.Documents ) {
                     Console.WriteLine( "        DOCUMENT " + d.Name );
@@ -819,15 +627,13 @@ namespace CsEdit.Avalonia {
     {
         internal ProjectDescriptor desc;
 
-        private string libraryPath;
         internal Dictionary<DocumentId,DocumentInfo_p> docInfoDict;
 
         private ProjectId pId;
 
-        public ProjectInfo_p( ProjectDescriptor pd, string libPath )
+        public ProjectInfo_p( ProjectDescriptor pd )
         {
             desc = pd;
-            libraryPath = libPath;
 
             docInfoDict = new Dictionary<DocumentId,DocumentInfo_p>();
 
@@ -854,7 +660,7 @@ namespace CsEdit.Avalonia {
 
                 string libPath;
                 if ( Path.IsPathRooted( libFile ) ) libPath = libFile;
-                else libPath = libraryPath + "/" + libFile;
+                else throw new Exception( "lib filepath must be absolute: " + libFile );
 
                 MetadataReference mdr = MetadataReference.CreateFromFile( libPath );
                 host.AddMetadataReference_alt( ws, ref sol, ref project, mdr );

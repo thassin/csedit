@@ -4,7 +4,22 @@
              x:Class="CsEdit.Avalonia.App">
 
   <Application.Styles>
+
+    <!--
+        there is also this Dark mode, but the default syntax-highlighting
+        colors appear to work better with the Light mode.
+
+        to adjust the syntax-highlighting colors,
+        see src/RoslynPad.Editor.Shared/CodeTextEditor.cs around line 85.
+
+        to adjust the default text color (used when no syntax-highlighting
+        is active) it is necessary to change the editor's "Foreground" property,
+        see CsEditCodeEditorWindow.axaml.cs around line 95.
+    <FluentTheme Mode="Dark"/>
+    -->
+
     <FluentTheme Mode="Light"/>
+
     <StyleInclude Source="avares://AvaloniaEdit/AvaloniaEdit.xaml" />
 
     <!-- Code completion (from AvaloniaEdit.Demo/App.xaml) -->

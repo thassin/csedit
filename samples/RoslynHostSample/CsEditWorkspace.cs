@@ -71,20 +71,26 @@ namespace RoslynHostSample
                 Assembly.Load("RoslynPad.Roslyn.Avalonia"),
                 Assembly.Load("RoslynPad.Editor.Avalonia")
 
-            }, RoslynHostReferences.NamespaceDefault.With(assemblyReferences: new[]
+            }, RoslynHostReferences.NamespaceDefault
+            /* skip... also see src/RoslynPad.Roslyn/RoslynHostReferences.cs about namespaces?
+            .With(assemblyReferences: new[]
             {
-                typeof(object).Assembly,
-
                 // TODO are all these relevant?
                 // TODO need to add something more here?
 
-                typeof(System.Text.RegularExpressions.Regex).Assembly,
-                typeof(System.Linq.Enumerable).Assembly,
-            }));
+                // do not add any fixed assemblies here.
+                // there is the mono/dotnetSKD issue (and maybe more version issues)?
+
+                //typeof(object).Assembly,
+                //typeof(System.Text.RegularExpressions.Regex).Assembly,
+                //typeof(System.Linq.Enumerable).Assembly,
+            }) */
+            );
 
             Console.WriteLine("RoslynHost created");
 
-            string libPath = "/usr/share/dotnet/shared/Microsoft.NETCore.App/6.0.5";
+            //string libPath = "/usr/share/dotnet/shared/Microsoft.NETCore.App/6.0.5";
+            string libPath = "/usr/share/dotnet/shared/Microsoft.NETCore.App/6.0.6";
             Console.WriteLine("using libPath: " + libPath);
 
             Console.WriteLine("creating workspace/solution");
@@ -108,6 +114,7 @@ namespace RoslynHostSample
                 // create a single project with 2 separate files.
 
                 pd = new ProjectDescriptor_p( "singleproject", libPath );
+                pd.LibraryFiles.Add("System.Private.CoreLib.dll");
                 pd.LibraryFiles.Add("System.Runtime.dll");
                 pd.LibraryFiles.Add("System.Console.dll");
                 pd.SourceFiles.Add("SampleFiles/ClassA.cs");
@@ -120,12 +127,14 @@ namespace RoslynHostSample
                 // and make the 2nd project use the 1st one using a reference.
 
                 pd = new ProjectDescriptor_p( "firstproject", libPath );
+                pd.LibraryFiles.Add("System.Private.CoreLib.dll");
                 pd.LibraryFiles.Add("System.Runtime.dll");
                 pd.LibraryFiles.Add("System.Console.dll");
                 pd.SourceFiles.Add("SampleFiles/ClassA.cs");
                 _projects.Add( pd );
 
                 pd = new ProjectDescriptor_p( "secondproject", libPath );
+                pd.LibraryFiles.Add("System.Private.CoreLib.dll");
                 pd.LibraryFiles.Add("System.Runtime.dll");
                 pd.SourceFiles.Add("SampleFiles/ClassB.cs");
                 pd.ProjectReferences.Add("firstproject");
@@ -137,6 +146,7 @@ namespace RoslynHostSample
                 // and make the 2nd project use the 1st one using a reference.
 
                 pd = new ProjectDescriptor_p( "firstproject", libPath );
+                pd.LibraryFiles.Add("System.Private.CoreLib.dll");
                 pd.LibraryFiles.Add("System.Runtime.dll");
                 pd.LibraryFiles.Add("System.Console.dll");
                 pd.SourceFiles.Add("SampleFiles/ClassC1.cs");
@@ -144,6 +154,7 @@ namespace RoslynHostSample
                 _projects.Add( pd );
 
                 pd = new ProjectDescriptor_p( "secondproject", libPath );
+                pd.LibraryFiles.Add("System.Private.CoreLib.dll");
                 pd.LibraryFiles.Add("System.Runtime.dll");
                 pd.SourceFiles.Add("SampleFiles/ClassD.cs");
                 pd.ProjectReferences.Add("firstproject");
