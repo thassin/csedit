@@ -19,7 +19,8 @@ namespace RoslynPad.Roslyn
     public class RoslynHost : IRoslynHost
     {
         internal static readonly ImmutableArray<string> PreprocessorSymbols =
-            ImmutableArray.CreateRange(new[] { "TRACE", "DEBUG" });
+            //ImmutableArray.CreateRange(new[] { "TRACE", "DEBUG" });
+            ImmutableArray.CreateRange(new[] { "TRACE", "DEBUG", "AVALONIA" }); // TOMMIH
 
         internal static readonly ImmutableArray<Assembly> DefaultCompositionAssemblies =
             ImmutableArray.Create(
@@ -388,21 +389,26 @@ namespace RoslynPad.Roslyn
             }
         }
 
-        public virtual CompilationOptions CreateCompilationOptions_alt(string workingDirectory, bool addDefaultImports)
+        public virtual CompilationOptions CreateCompilationOptions_alt( bool enableNullableReferenceTypes )
         {
-            Console.WriteLine( "CreateCompilationOptions_alt() : DefaultImports.Length = " + DefaultImports.Length );
-            foreach ( var x in DefaultImports ) Console.WriteLine( "    " + x.ToString() );
+            // 20220809 these are not needed?
+            const bool addDefaultImports = false;
 
-            var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+            //Console.WriteLine( "CreateCompilationOptions_alt() : DefaultImports.Length = " + DefaultImports.Length );
+            //foreach ( var x in DefaultImports ) Console.WriteLine( "    " + x.ToString() );
+
+            var compilationOptions = new CSharpCompilationOptions( OutputKind.DynamicallyLinkedLibrary,
+
                 usings: addDefaultImports ? DefaultImports : ImmutableArray<string>.Empty,
                 allowUnsafe: true,
                 sourceReferenceResolver: null, // new SourceFileResolver(ImmutableArray<string>.Empty, workingDirectory),
 
                 // all #r references are resolved by the editor/msbuild
-                metadataReferenceResolver: null, // DummyScriptMetadataResolver.Instance, // ???
+                metadataReferenceResolver: null, // DummyScriptMetadataResolver.Instance, // not needed?
 
                 // TODO nullableContextOptions is only for languageversion 8 and above.
-                nullableContextOptions: NullableContextOptions.Enable);
+                nullableContextOptions: enableNullableReferenceTypes ? NullableContextOptions.Enable : NullableContextOptions.Disable );
+
             return compilationOptions;
         }
 

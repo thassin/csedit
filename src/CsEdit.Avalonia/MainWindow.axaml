@@ -1,13 +1,77 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+
+ xmlns:models="clr-namespace:CsEdit.Avalonia;assembly=CsEdit.Avalonia"
+
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="CsEdit.Avalonia.MainWindow"
-        Width="350" Height="100"
+        Width="370" Height="420"
         Title="CsEdit.Avalonia">
 
-        <StackPanel>
-                <Button Width="250" Click="OnButtonClick">Open a new editor window</Button>
+
+        <!--    <Button Width="250" Click="OnButtonClick">Open a new editor window</Button>  -->
+
+
+<!--
+        <StackPanel> this prevents ScrollViewer from working, since it tells there's always enogh space...
+	<ScrollViewer 
+		VerticalScrollBarVisibility="Auto"
+		HorizontalScrollBarVisibility="Disabled"  >
+-->
+
+    <StackPanel Orientation="Horizontal">
+
+    <TreeView 
+	ScrollViewer.VerticalScrollBarVisibility="Auto"
+	ScrollViewer.HorizontalScrollBarVisibility="Disabled" 
+	Items="{Binding Projects}">
+
+        <TreeView.DataTemplates>
+
+            <TreeDataTemplate DataType="models:TreeItemProject" ItemsSource="{Binding Files}">
+                <TextBlock Foreground="Red" Text="{Binding ProjectName}" />
+            </TreeDataTemplate>
+
+            <DataTemplate DataType="models:TreeItemFile">
+
+<!--
+    what we would like to have here for each TreeItemFile row is:
+    1) there is a fixed-size button (to open/show a file), and a variable-length text (filename) which may/should occupy all available space.
+    2) if the mainwindow is resized, the TreeItemFile rows should resize accordingly.
+    => is it possible to use grid at all??? only one item allowed, so StackPanel or similar container is needed anyway?
+    => in practice it is easier to put the fixed-size button to left, and have the variable-length text at right.
+
+
+-->
+
+                <StackPanel Orientation="Horizontal">
+
+                <Button   Width="60"     Click="OnButtonClick" CommandParameter="{Binding FileName}"        x:Name="{Binding FileName}"   Content="open"   Background="LightGray"  ></Button>
+
+                <TextBlock  MinWidth="100"         HorizontalAlignment="Stretch"   Text="{Binding FileName}"      VerticalAlignment="Center" Margin="10" />
+
+            <!--    
+<TextBlock MinWidth="200" HorizontalAlignment="Stretch"    Text="{Binding FileName}"    VerticalAlignment="Center"  />    
+                <Button Grid.Column="2" Width="60"     Click="OnButtonClick" CommandParameter="{Binding FileName}"        Name="{Binding FileName}"   Content="xxyy"   Background="Red"  ></Button>
+                <TextBlock Grid.Column="1"  Width="250" Text="{Binding FileName}"     VerticalAlignment="Center"  />
+-->
+
+
+                </StackPanel>
+
+
+            </DataTemplate>    
+        </TreeView.DataTemplates>
+    </TreeView>
+
+    </StackPanel>
+
+<!--
+	</ScrollViewer>
         </StackPanel>
+-->
+
+
 </Window>

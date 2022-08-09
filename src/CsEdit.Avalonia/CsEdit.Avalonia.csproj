@@ -38,6 +38,15 @@
     <ProjectReference Include="..\RoslynPad.Roslyn.Avalonia\RoslynPad.Roslyn.Avalonia.csproj" />
     <ProjectReference Include="..\RoslynPad.Editor.Avalonia\RoslynPad.Editor.Avalonia.csproj" />
 
+<!--
+notice that RoslynPad.Editor.Avalonia effectively contains RoslynPad.Editor.Shared using:
+  <ItemGroup>
+    <Compile Include="..\RoslynPad.Editor.Shared\**\*.cs">
+      <Link>Shared\%(RecursivePath)%(Filename)%(Extension)</Link>
+    </Compile>
+  </ItemGroup>
+-->
+
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="$(RoslynPackageVersion)" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="$(RoslynPackageVersion)" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="$(RoslynPackageVersion)" />

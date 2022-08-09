@@ -16,6 +16,9 @@ namespace CsEdit.Avalonia {
 
     public class NewVsProjectFileReader : IProjectReader {
 
+        private LanguageVersion defaultLanguageVersion;
+        private bool defaultNullableReferenceTypes;
+
         private Dictionary<string,string> props = new Dictionary<string,string>();
 
         public bool TryRead( string dirPathRel, List<ProjectDescriptor> pList, out RuntimeConfig cfg ) {
@@ -34,9 +37,15 @@ namespace CsEdit.Avalonia {
                 if ( pItem.Key == "$(Nullable)" ) nullableAsString = pItem.Value;
             }
 
-            // in principle, the properties "LangVersion" and "Nullable" could be set in ".csproj"
-            // files as well, but setting them just once in build-props is the preferred way.
-            // => for clarity just assume that build-props is the source for those items.
+            defaultLanguageVersion = LanguageVersion.CSharp7_3;
+            defaultNullableReferenceTypes = false;
+
+            ParseLangVersion( langVersionAsString, ref defaultLanguageVersion );
+            ParseNullable( nullableAsString, ref defaultNullableReferenceTypes );
+
+            // the properties "LangVersion" and "Nullable" could be set in ".csproj" files as well.
+            // => for roslyn "LangVersion" cannot be set project-wise???
+            // => for roslyn "Nullable" is defined project-wise.
 
             bool result = TryRead_p( dirPathRel, pList, 0 );
 
@@ -86,23 +95,13 @@ namespace CsEdit.Avalonia {
                 cfg = new RuntimeConfig();
                 cfg.Runtime = runtime;
                 cfg.TargetFramework = targetFramework;
-                cfg.LanguageVersion = LanguageVersion.CSharp7_3;
-                cfg.NullableReferenceTypes = false;
 
-                if ( langVersionAsString != null ) {
-                    langVersionAsString = langVersionAsString.ToLower();
-                    if ( langVersionAsString == "8.0" ) cfg.LanguageVersion = LanguageVersion.CSharp8;
-                    if ( langVersionAsString == "9.0" ) cfg.LanguageVersion = LanguageVersion.CSharp9;
-                    if ( langVersionAsString == "10.0" ) cfg.LanguageVersion = LanguageVersion.CSharp10;
-                    if ( langVersionAsString == "default" ) cfg.LanguageVersion = LanguageVersion.Default;
-                    if ( langVersionAsString == "latest" ) cfg.LanguageVersion = LanguageVersion.Latest;
-                    if ( langVersionAsString == "latestmajor" ) cfg.LanguageVersion = LanguageVersion.LatestMajor;
-                    if ( langVersionAsString == "preview" ) cfg.LanguageVersion = LanguageVersion.Preview;
-                }
-
-                if ( nullableAsString != null ) {
-                    nullableAsString = nullableAsString.ToLower();
-                    if ( nullableAsString == "enable" ) cfg.NullableReferenceTypes = true;
+// languageversion is a bit odd setting, since apparently it cannot be set project-wise.
+// => therefore pick up the maximum value from projects, and use that...
+                cfg.LanguageVersion = pp.LanguageVersion;
+                for ( int i = 0; i < pList.Count; i++ ) {
+                    LanguageVersion lv = pList[i].LanguageVersion;
+                    if ( lv > cfg.LanguageVersion ) cfg.LanguageVersion = lv;
                 }
 
                 AddLibraries( runtime, targetFramework, pList );
@@ -110,6 +109,32 @@ namespace CsEdit.Avalonia {
 
             return result;
         }
+
+
+
+private void ParseLangVersion( string txt, ref LanguageVersion val ) {
+    if ( txt != null ) {
+        txt = txt.ToLower();
+        // TODO add the pre-7 versions...
+        if ( txt == "8.0" ) val = LanguageVersion.CSharp8;
+        if ( txt == "9.0" ) val = LanguageVersion.CSharp9;
+        if ( txt == "10.0" ) val = LanguageVersion.CSharp10;
+        if ( txt == "default" ) val = LanguageVersion.Default;
+        if ( txt == "latest" ) val = LanguageVersion.Latest;
+        if ( txt == "latestmajor" ) val = LanguageVersion.LatestMajor;
+        if ( txt == "preview" ) val = LanguageVersion.Preview;
+    }
+}
+
+private void ParseNullable( string txt, ref bool val ) {
+    if ( txt != null ) {
+        txt = txt.ToLower();
+        if ( txt == "enable" ) val = true;
+        if ( txt == "disable" ) val = false;
+    }
+}
+
+
 
         private void FindAndReadDirectoryBuildPropsFile( string dirPathRel ) {
 
@@ -164,8 +189,8 @@ namespace CsEdit.Avalonia {
                                 }
                             }
 
-// PERSKULES hyppii ohi osasta elementtejä???
-// https://stackoverflow.com/questions/24991218/c-sharp-xmlreader-skips-nodes-after-using-readelementcontentas
+// WARNING might skip some elements quite easily??? see this:
+// https://stackoverflow.com/questions/24991218/c-sharp-xmlreader-skips-nodes-after-using-readelementcontentas 
 
                             if ( ( reader.NodeType == XmlNodeType.EndElement ) && ( reader.Name == "PropertyGroup" ) ) {
                                 Console.WriteLine( "END reading element: PropertyGroup" );
@@ -189,6 +214,9 @@ namespace CsEdit.Avalonia {
         }
 
         private bool TryRead_p( string dirPathRel, List<ProjectDescriptor> pList, int depth ) {
+
+            LanguageVersion languageVersion = defaultLanguageVersion;
+            bool nullableReferenceTypes = defaultNullableReferenceTypes;
 
             Console.WriteLine();
             Console.WriteLine();
@@ -228,6 +256,9 @@ namespace CsEdit.Avalonia {
             string sdk = null;
             string targetFramework = null;
 
+            string langVersion = null;
+            string nullable = null;
+
             List<string> srcFileNames = new List<string>();
             List<string> libFileNames = new List<string>();
 
@@ -255,7 +286,17 @@ namespace CsEdit.Avalonia {
 
                             if ( ( reader.NodeType == XmlNodeType.Element ) && ( reader.Name == "TargetFramework" ) ) {
                                 targetFramework = reader.ReadString();
-                                Console.WriteLine( "found targetFramework: " + targetFramework );
+                                Console.WriteLine( "found TargetFramework: " + targetFramework );
+                            }
+
+                            if ( ( reader.NodeType == XmlNodeType.Element ) && ( reader.Name == "LangVersion" ) ) {
+                                langVersion = reader.ReadString();
+                                Console.WriteLine( "found LangVersion: " + langVersion );
+                            }
+
+                            if ( ( reader.NodeType == XmlNodeType.Element ) && ( reader.Name == "Nullable" ) ) {
+                                nullable = reader.ReadString();
+                                Console.WriteLine( "found Nullable: " + nullable );
                             }
 
                             if ( ( reader.NodeType == XmlNodeType.EndElement ) && ( reader.Name == "PropertyGroup" ) ) {
@@ -292,6 +333,33 @@ namespace CsEdit.Avalonia {
                                 }
                             }
 
+
+
+//xxxx compile Include ja Remove:
+//     <Compile Remove="SampleFiles\**" />
+//     <Compile Include="..\RoslynPad.Editor.Shared\**\*.cs">
+jatka
+
+                            if ( ( reader.NodeType == XmlNodeType.Element ) && ( reader.Name == "Compile" ) ) {
+                                if ( reader.HasAttributes ) {
+                                    string compInclude = reader.GetAttribute("Include");
+                                    string compRemove = reader.GetAttribute("Remove");
+
+                                    if ( string.IsNullOrWhiteSpace( compInclude ) == false ) {
+                                        Console.WriteLine( "found COMPILE Include : " + compInclude );
+                                    }
+
+                                    if ( string.IsNullOrWhiteSpace( compRemove ) == false ) {
+                                        Console.WriteLine( "found COMPILE Remove : " + compRemove );
+                                    }
+                                }
+                            }
+
+
+
+
+
+
                             if ( ( reader.NodeType == XmlNodeType.EndElement ) && ( reader.Name == "ItemGroup" ) ) {
                                 Console.WriteLine( "END reading element: ItemGroup" );
                                 break;
@@ -318,6 +386,9 @@ namespace CsEdit.Avalonia {
             if ( sdk != "Microsoft.NET.Sdk" ) return false;
 
             Console.WriteLine( "CONTINUE READING..." );
+
+            ParseLangVersion( langVersion, ref languageVersion );
+            ParseNullable( nullable, ref nullableReferenceTypes );
 
             // need to include all local .cs files?
             // by default, unless told otherwise?
@@ -402,7 +473,7 @@ namespace CsEdit.Avalonia {
                 }
             }
 
-            ProjectDescriptor pd = new ProjectDescriptor( pName, targetFramework, srcFileNames.ToArray(), prList2.ToArray(), pkgRefs );
+            ProjectDescriptor pd = new ProjectDescriptor( pName, targetFramework, srcFileNames.ToArray(), prList2.ToArray(), pkgRefs, languageVersion, nullableReferenceTypes );
             pList.Add( pd );
 
             return true;
@@ -691,11 +762,11 @@ lrwxrwxrwx 1 root root       23 Jun 15 01:06 /usr/lib/mono/4.0/mscorlib.dll -> .
                 if ( targetFramework == "netstandard2.0" ) targetFramework = "netcoreapp3.1";
 
                 if ( targetFramework == "netcoreapp3.1" ) {
-                    libPath = "/usr/share/dotnet/shared/Microsoft.NETCore.App/3.1.26";
+                    libPath = "/usr/share/dotnet/shared/Microsoft.NETCore.App/3.1.27";
                 }
 
                 if ( targetFramework == "net6.0" ) {
-                    libPath = "/usr/share/dotnet/shared/Microsoft.NETCore.App/6.0.6";
+                    libPath = "/usr/share/dotnet/shared/Microsoft.NETCore.App/6.0.7";
                 }
 
                 if ( libPath != null ) {
@@ -710,7 +781,7 @@ lrwxrwxrwx 1 root root       23 Jun 15 01:06 /usr/lib/mono/4.0/mscorlib.dll -> .
                 Console.WriteLine();
                 Console.WriteLine( "ERROR: NewVsProjectFileReader.GetDllPath() failed." );
                 Console.WriteLine( "  =>  could not find dll " + dllName + " for " + runtime + " / " + targetFramework + "." );
-                Console.WriteLine( "  =>  see NewVsProjectFileReader.cs around line 440 and check the paths in your local system." );
+                Console.WriteLine( "  =>  see NewVsProjectFileReader.cs around line 700 and check the paths in your local system." );
                 Console.WriteLine();
                 throw new Exception( "dllPath not found" );
             }

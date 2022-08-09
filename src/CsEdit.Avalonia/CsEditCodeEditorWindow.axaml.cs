@@ -45,12 +45,15 @@ namespace CsEdit.Avalonia
         public CsEditCodeEditorWindow()
         {
             InitializeComponent();
+
+Focusable = true;
+
             Closing += OnClosing;
 #if DEBUG
             this.AttachDevTools();
 #endif
 
-// "size" is of type (Avalonia.Controls.) Size?
+// "size" is of type (Avalonia.Controls.)Size?
 // https://stackoverflow.com/questions/70338154/avalonia-keep-window-position-after-resize
             ClientSizeProperty.Changed.Subscribe( size =>
             {
@@ -69,6 +72,16 @@ namespace CsEdit.Avalonia
                 editorControl.Height = size.NewValue.Value.Height - 10;
             });
 
+            //Console.WriteLine( "Screens.ScreenCount = " + Screens.ScreenCount );
+
+            // at linux, multiple screens appear as one big screen here.
+            // => usually multiple screens are arranged side-by-side.
+            // => the height value is more reliable.
+
+            int screenHeight = Screens.Primary.WorkingArea.Height;
+
+            Width = (int) ( screenHeight * 1.20 );
+            Height = (int) ( screenHeight * 0.80 );
         }
 
         private void InitializeComponent()
@@ -127,8 +140,43 @@ namespace CsEdit.Avalonia
             editorControl.DataContext = dvm;
 
             OnItemLoaded( editorControl, docId) ;
-
         }
+
+
+
+        public void SelectAndShowTextSpan( int start, int length ) {
+
+            // first make sure that the new selection will be visible.
+            // NOTICE the methods like TextEditor.ScollTo(line,column) are not working?
+
+            _editorControl.TextArea.Caret.Offset = start;
+            _editorControl.TextArea.Caret.BringCaretToView();
+
+            // then make the actual selection.
+
+            _editorControl.Select( start, length );
+
+            if ( IsActive == false ) {
+                // it seems that this window is not the topmost one,
+                // so activate it now...
+                ActivateWindow();
+            }
+        }
+
+        public void ActivateWindow() {
+
+            // there is a method Window.Activate() which is intended to give focus to a window.
+            // however, at Linux/XWindow system it depends on the windowmanager functionality, and is often blocked.
+            // => but this (store position, hide and show, revert position) is an excellent replacement.
+
+            PixelPoint pos = Position;
+            Hide();
+
+            Show();
+            Position = pos;
+        }
+
+
 
         private void OnMenuClick_goToDefinition(object sender, RoutedEventArgs e)
         {
@@ -179,7 +227,7 @@ Console.WriteLine( string.Format("Line {0} Column {1}", _editorControl.TextArea.
             IDocumentModificationsTracker tracker = CsEditWorkspace.Instance.GetTracker( docId );
             container.SetTracker( tracker );
 
-            CsEditWorkspace.Instance.SetEditorWindowAsOpened( docId, editor, container );
+            CsEditWorkspace.Instance.SetEditorWindowAsOpened( docId, this, container );
 
             viewModel.Initialize(documentId);
         }
@@ -210,6 +258,9 @@ Console.WriteLine( string.Format("Line {0} Column {1}", _editorControl.TextArea.
             private bool _isReadOnly;
             private readonly RoslynHost _host;
             private string _result;
+
+//public int DefaultWidth { get; } = 1700;
+//public int DefaultHeight { get; } = 1700;
 
             public DocumentViewModel(RoslynHost host, DocumentViewModel previous)
             {

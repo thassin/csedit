@@ -1,3 +1,4 @@
+
 ﻿using System;
 using System.IO;
 
@@ -42,7 +43,7 @@ namespace CsEdit.Avalonia
 
             ProjectsProvider.Init( wrkdir );
 
-            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime( args );
         }
 
         // Avalonia configuration, don't remove; also used by visual designer.
@@ -52,3 +53,4 @@ namespace CsEdit.Avalonia
                 .LogToTrace();
     }
 }
+

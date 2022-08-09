@@ -29,7 +29,10 @@ namespace CsEdit.Avalonia {
         public string[] ProjectReferences { get; private set; }
         public Dictionary<string,string> PackageReferences { get; private set; }
 
-        public ProjectDescriptor( string name, string target, string[] srcFiles, string[] projRefs, Dictionary<string,string> pkgRefs ) {
+        public LanguageVersion LanguageVersion { get; private set; }
+        public bool NullableReferenceTypes { get; private set; }
+
+        public ProjectDescriptor( string name, string target, string[] srcFiles, string[] projRefs, Dictionary<string,string> pkgRefs, LanguageVersion lv, bool nrt ) {
 
             ProjectNameUniq = name;
             TargetFramework = target;
@@ -40,6 +43,9 @@ namespace CsEdit.Avalonia {
             SourceFiles = srcFiles;
             ProjectReferences = projRefs;
             PackageReferences = pkgRefs;
+
+            LanguageVersion = lv;
+            NullableReferenceTypes = nrt;
         }
 
         public void SetLibraries( string[] libFiles ) {
@@ -48,23 +54,29 @@ namespace CsEdit.Avalonia {
         }
     }
 
+    // the idea of "DocumentDescriptor" is to transfer the projects data to MainWindowViewModel,
+    // while keeping the master data protected under "CsEditWorkspace".
+
     public class DocumentDescriptor {
 
+        public ProjectId ProjectId;
+        public string ProjectNameUniq;
+
+        public DocumentId DocumentId;
         public string FilePathUniq;
 
-        public ProjectId ProjectId;
-        public DocumentId DocumentId;
+        public TreeItemFile TreeItem;
+        public CsEditCodeEditorWindow EditorWindow;
     }
 
     // https://docs.microsoft.com/en-us/aspnet/web-forms/overview/deployment/web-deployment-in-the-enterprise/understanding-the-project-file 
     // https://natemcmaster.com/blog/2017/03/09/vs2015-to-vs2017-upgrade/ 
 
-    //public ProjectReaderResult {
     public class RuntimeConfig {
         public string Runtime;
         public string TargetFramework;
-        public LanguageVersion LanguageVersion;
-        public bool NullableReferenceTypes;
+        public LanguageVersion LanguageVersion; // the HIGHEST value from projects
+        //public bool NullableReferenceTypes; 20220809 moved into ProjectDescriptor
     }
 
     public interface IProjectReader {
@@ -164,6 +176,18 @@ namespace CsEdit.Avalonia {
         }
     }
 
+
+
+    public interface IEditorWindowEventListener {
+        void EditorWindowOpened( DocumentId docId );
+        void EditorWindowClosed( DocumentId docId );
+// TODO need to add the modified/saved events here as well???
+// TODO need to add the modified/saved events here as well???
+// TODO need to add the modified/saved events here as well???
+    }
+
+
+
     public class CsEditWorkspace {
 
         private List<ProjectInfo_p> _projects;
@@ -174,6 +198,9 @@ namespace CsEdit.Avalonia {
 
         private RoslynWorkspace _ws;
         private Solution _sol;
+
+        // currently we need to have just one listener (MainWindowViewModel).
+        public IEditorWindowEventListener Listener { get; set; }
 
         #region singleton
 
@@ -249,17 +276,12 @@ namespace CsEdit.Avalonia {
 
             _host.AddAnalyzerReferences( _ws, ref _sol );
 
-// TODO the first parameter is not used???
-// TODO the first parameter is not used???
-// TODO the first parameter is not used???
-            CompilationOptions compilationOptions = _host.CreateCompilationOptions_alt( "/tmp/testvalue", true );
-
             _projects = new List<ProjectInfo_p>();
 
             foreach ( ProjectDescriptor pd in ProjectsProvider.Projects ) {
 
                 Console.WriteLine();
-                Console.WriteLine( "CREATING PROJECT: " + pd.ProjectNameUniq + " for " + pd.TargetFramework );
+                Console.WriteLine( "CREATING PROJECT: " + pd.ProjectNameUniq + " for " + pd.TargetFramework + " NRT=" + pd.NullableReferenceTypes );
                 Console.WriteLine();
 
                 _projects.Add( new ProjectInfo_p( pd ) );
@@ -304,6 +326,8 @@ namespace CsEdit.Avalonia {
                 Console.WriteLine();
                 Console.WriteLine( "creating the project: " + x.desc.ProjectNameUniq );
 
+                CompilationOptions compilationOptions = _host.CreateCompilationOptions_alt( x.desc.NullableReferenceTypes );
+
                 ProjectId projectId = x.CreateProject( _host, _ws, ref _sol, compilationOptions, projectReferences );
             }
 
@@ -337,9 +361,16 @@ namespace CsEdit.Avalonia {
                 ProjectId projId = pd.GetProjectId();
                 foreach( KeyValuePair<DocumentId,DocumentInfo_p> entry in pd.docInfoDict ) {
                     DocumentDescriptor dd = new DocumentDescriptor();
+
                     dd.ProjectId = projId;
+                    dd.ProjectNameUniq = pd.desc.ProjectNameUniq;
+
                     dd.DocumentId = entry.Key;
                     dd.FilePathUniq = entry.Value.FilePathUniq;
+
+                    // MainWindowViewModel will set this.
+                    dd.TreeItem = null;
+
                     docs.Add( dd );
                 }
             }
@@ -424,10 +455,10 @@ namespace CsEdit.Avalonia {
             throw new Exception( "ERROR no document found for DocumentId " + docId.ToString() );
         }
 
-        public RoslynCodeEditor GetEditor( DocumentId docId ) {
+        public CsEditCodeEditorWindow GetEditorWindow( DocumentId docId ) {
             foreach ( ProjectInfo_p pd in _projects ) {
                 foreach( KeyValuePair<DocumentId,DocumentInfo_p> entry in pd.docInfoDict ) {
-                    if ( entry.Key == docId ) return entry.Value.currentEditorControl;
+                    if ( entry.Key == docId ) return entry.Value.currentEditorWindow;
                 }
             }
             throw new Exception( "ERROR no document found for DocumentId " + docId.ToString() );
@@ -443,13 +474,16 @@ namespace CsEdit.Avalonia {
             throw new Exception( "ERROR no document found for DocumentId " + docId.ToString() );
         }
 
-        public void SetEditorWindowAsOpened( DocumentId docId, RoslynCodeEditor editor, AvalonEditTextContainer container ) {
+        public void SetEditorWindowAsOpened( DocumentId docId, CsEditCodeEditorWindow editorWindow, AvalonEditTextContainer textContainer ) {
             Dictionary<DocumentId,string> d = new Dictionary<DocumentId,string>();
             foreach ( ProjectInfo_p pd in _projects ) {
                 foreach( KeyValuePair<DocumentId,DocumentInfo_p> entry in pd.docInfoDict ) {
                     if ( entry.Key == docId ) {
-                        entry.Value.currentEditorControl = editor;
-                        entry.Value.currentTextContainer = container;
+                        entry.Value.currentEditorWindow = editorWindow;
+                        entry.Value.currentTextContainer = textContainer;
+
+                        if ( Listener != null ) Listener.EditorWindowOpened( docId );
+
                         return;
                     }
                 }
@@ -468,8 +502,11 @@ namespace CsEdit.Avalonia {
 
                         SyncModifiedContainersToDocuments( docId );
 
-                        entry.Value.currentEditorControl = null;
+                        entry.Value.currentEditorWindow = null;
                         entry.Value.currentTextContainer = null;
+
+                        if ( Listener != null ) Listener.EditorWindowClosed( docId );
+
                         return;
                     }
                 }
@@ -571,14 +608,13 @@ namespace CsEdit.Avalonia {
                                     Console.WriteLine( "  =>  Symbol location is in source: " + filePath + " start=" + span.Start + " length=" + span.Length );
 
                                     DocumentId d = CsEditWorkspace.Instance.FindDocumentByFilePath( filePath );
-                                    RoslynCodeEditor editor = CsEditWorkspace.Instance.GetEditor( d );
+                                    CsEditCodeEditorWindow editor = CsEditWorkspace.Instance.GetEditorWindow( d );
                                     if ( editor == null ) {
-                                        Console.WriteLine( "  =>  document is closed." );
-// TODO open the document, and add an extra param about selection???
-// TODO open the document, and add an extra param about selection???
-// TODO open the document, and add an extra param about selection???
+                                        // open a new editor-window...
+                                        MainWindowViewModel.Instance.CreateOrShowEditorWindow( filePath, span );
                                     } else {
-                                        editor.Select( span.Start, span.Length );
+                                        // activate an existing editor-window...
+                                        editor.SelectAndShowTextSpan( span.Start, span.Length );
                                     }
                                 }
 
@@ -586,6 +622,8 @@ namespace CsEdit.Avalonia {
                                 Console.WriteLine( "  =>  TODO Symbol location information missing." );
                             }
                         }
+                    } else {
+                        Console.WriteLine( "  =>  Symbol not found." );
                     }
                 }
             } catch ( Exception e ) {
@@ -733,10 +771,10 @@ namespace CsEdit.Avalonia {
         public DocumentId DocId { get; private set; }
         public string FilePathUniq { get; private set; }
 
-        public RoslynCodeEditor currentEditorControl { get; set; }
+        public CsEditCodeEditorWindow currentEditorWindow { get; set; }
         public AvalonEditTextContainer currentTextContainer { get; set; }
 
-        public bool IsEditorWindowOpen { get { return currentEditorControl != null; } }
+        public bool IsEditorWindowOpen { get { return currentEditorWindow != null; } }
 
 // TODO eventually need to have 2 separate modification counters:
 // 1) modifications since last sync to Roslyn Document object (the current counter).
@@ -747,7 +785,7 @@ namespace CsEdit.Avalonia {
             DocId = docId;
             FilePathUniq = filePath;
 
-            currentEditorControl = null;
+            currentEditorWindow = null;
             currentTextContainer = null;
 
             ResetTextModificationCount();

@@ -18,8 +18,11 @@
                                                  HorizontalScrollBarVisibility="Visible"
                                                  VerticalScrollBarVisibility="Visible"
                                                  ShowLineNumbers="False"
-					         Width="590" Height="390" />
+    />
 
+<!--
+					         Width="590" Height="390" />
+-->
 
 <!-- TODO how to make the scrollbars work correctly?
 	and window resizing in general?
