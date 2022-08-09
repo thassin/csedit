@@ -338,7 +338,7 @@ private void ParseNullable( string txt, ref bool val ) {
 //xxxx compile Include ja Remove:
 //     <Compile Remove="SampleFiles\**" />
 //     <Compile Include="..\RoslynPad.Editor.Shared\**\*.cs">
-jatka
+//jatka
 
                             if ( ( reader.NodeType == XmlNodeType.Element ) && ( reader.Name == "Compile" ) ) {
                                 if ( reader.HasAttributes ) {
