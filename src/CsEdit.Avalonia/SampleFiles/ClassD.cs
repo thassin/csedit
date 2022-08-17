@@ -7,10 +7,10 @@ namespace SampleFiles
         public void MethodX()
         {
             string name = "Joe";
+
             var c = new ClassC();
             c.MethodA( name );
             c.MethodA( "sum is " + c.MethodB( 1, 2 ) );
         }
     }
 }
-

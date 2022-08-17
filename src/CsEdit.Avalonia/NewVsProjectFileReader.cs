@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Xml;
 
 using Microsoft.CodeAnalysis.CSharp;
@@ -267,6 +268,9 @@ private void ParseNullable( string txt, ref bool val ) {
 
             Dictionary<string,string> pkgRefs = new Dictionary<string,string>();
 
+List<string> compIncludes = new List<string>();
+List<string> compRemoves = new List<string>();
+
             XmlReaderSettings settings = new XmlReaderSettings();
             settings.IgnoreWhitespace = true;
 
@@ -333,39 +337,46 @@ private void ParseNullable( string txt, ref bool val ) {
                                 }
                             }
 
-
-
-//xxxx compile Include ja Remove:
-//     <Compile Remove="SampleFiles\**" />
-//     <Compile Include="..\RoslynPad.Editor.Shared\**\*.cs">
-//jatka
-
                             if ( ( reader.NodeType == XmlNodeType.Element ) && ( reader.Name == "Compile" ) ) {
                                 if ( reader.HasAttributes ) {
-                                    string compInclude = reader.GetAttribute("Include");
-                                    string compRemove = reader.GetAttribute("Remove");
+                                    string globbed;
 
-                                    if ( string.IsNullOrWhiteSpace( compInclude ) == false ) {
-                                        Console.WriteLine( "found COMPILE Include : " + compInclude );
+                                    // values should be globbed paths (using the windows-path-separators) like these:
+                                    // <Compile Include="..\RoslynPad.Editor.Shared\**\*.cs" ...
+                                    // <Compile Remove="SomeFolder\**" ...
+
+                                    globbed = reader.GetAttribute("Include");
+                                    if ( string.IsNullOrWhiteSpace( globbed ) == false ) {
+
+                                        if ( Path.DirectorySeparatorChar != '\\' ) {
+                                            globbed = globbed.Replace( '\\', Path.DirectorySeparatorChar );
+                                        }
+
+                                        Console.WriteLine( "found COMPILE Include : " + globbed );
+
+                                        compIncludes.Add( globbed );
                                     }
 
-                                    if ( string.IsNullOrWhiteSpace( compRemove ) == false ) {
-                                        Console.WriteLine( "found COMPILE Remove : " + compRemove );
+                                    globbed = reader.GetAttribute("Remove");
+                                    if ( string.IsNullOrWhiteSpace( globbed ) == false ) {
+
+                                        if ( Path.DirectorySeparatorChar != '\\' ) {
+                                            globbed = globbed.Replace( '\\', Path.DirectorySeparatorChar );
+                                        }
+
+                                        // convert the "remove"-directions to regex strings at this stage.
+                                        // => soon we must test each of these against each local filename...
+
+                                        string regex = PathGlobbingHelpers.GlobbedPathToRegex( globbed, Path.DirectorySeparatorChar + "" );
+
+                                        Console.WriteLine( "found COMPILE Remove : " + globbed );
+                                        //Console.WriteLine( "  =>  COMPILE-R regex : " + regex );
+
+                                        compRemoves.Add( regex );
                                     }
                                 }
                             }
 
-
-
-
-
-
-                            if ( ( reader.NodeType == XmlNodeType.EndElement ) && ( reader.Name == "ItemGroup" ) ) {
-                                Console.WriteLine( "END reading element: ItemGroup" );
-                                break;
-                            }
-                        }
-                    }
 
 /* TODO a plain library reference like this still missing:
 
@@ -377,6 +388,13 @@ private void ParseNullable( string txt, ref bool val ) {
 
 */
 
+
+                            if ( ( reader.NodeType == XmlNodeType.EndElement ) && ( reader.Name == "ItemGroup" ) ) {
+                                Console.WriteLine( "END reading element: ItemGroup" );
+                                break;
+                            }
+                        }
+                    }
                 }
             }
 
@@ -390,37 +408,79 @@ private void ParseNullable( string txt, ref bool val ) {
             ParseLangVersion( langVersion, ref languageVersion );
             ParseNullable( nullable, ref nullableReferenceTypes );
 
-            // need to include all local .cs files?
-            // by default, unless told otherwise?
+            // need to include all local .cs files? also from subdirectories?
+            // check against compRemoves.
 
-            string srcFileSarchPath = ProjectsProvider.WorkingDirectory;
-            srcFileSarchPath += Path.DirectorySeparatorChar + dirPathRel;
+            string srcFileSearchPath = ProjectsProvider.WorkingDirectory;
+            srcFileSearchPath += Path.DirectorySeparatorChar + dirPathRel;
 
-            string[] items = Directory.GetFiles( srcFileSarchPath, "*.cs", SearchOption.AllDirectories );
+            string[] items = Directory.GetFiles( srcFileSearchPath, "*.cs", SearchOption.AllDirectories );
 
             foreach ( string resultPath in items ) {
 
                 if ( File.Exists( resultPath ) == false ) continue; // ignore directories etc.
 
-                string filePath = Path.GetRelativePath( srcFileSarchPath, resultPath );
+                string filePath = Path.GetRelativePath( srcFileSearchPath, resultPath );
 
-                // ignore results from "bin" and "obj" -folders.
-                if ( filePath.StartsWith( "bin" + Path.DirectorySeparatorChar ) ) continue;
-                if ( filePath.StartsWith( "obj" + Path.DirectorySeparatorChar ) ) continue;
+                string testPath = filePath; // for testing, remove leading "./" if needed...
+                if ( testPath.StartsWith( "." + Path.DirectorySeparatorChar ) ) testPath = testPath.Substring( 2 );
 
+                bool skip = false;
 
+                if ( testPath.StartsWith( "bin" + Path.DirectorySeparatorChar ) ) skip = true;
+                if ( testPath.StartsWith( "obj" + Path.DirectorySeparatorChar ) ) skip = true;
 
-// TODO need to ignore other folders as well... from csproj properties...
-// TODO need to ignore other folders as well... from csproj properties...
-// TODO need to ignore other folders as well... from csproj properties...
-                if ( filePath.StartsWith( "SampleFiles" + Path.DirectorySeparatorChar ) ) continue;
+                if ( skip ) {
+                    Console.WriteLine( "skip file by compRemove : " + filePath );
+                    continue;
+                }
 
+                foreach ( string compRemove in compRemoves ) {
+                    if ( Regex.Match( testPath, compRemove ).Success ) {
+                        skip = true;
+                        break;
+                    }
+                }
 
+                if ( skip ) {
+                    Console.WriteLine( "skip file by compRemove : " + filePath );
+                    continue;
+                }
 
                 Console.WriteLine( "addsrc GOT FILEPATH: " + filePath );
                 Console.WriteLine( "addsrc RELATIVE PATH: " + dirPathRel );
 
                 srcFileNames.Add( dirPathRel + Path.DirectorySeparatorChar + filePath );
+            }
+
+            // add files based on compIncludes.
+
+            foreach ( string globbed in compIncludes ) {
+
+                string searchPath = globbed;
+                if ( searchPath.IndexOf( '*' ) >= 0 ) {
+                    searchPath = searchPath.Substring( 0, searchPath.IndexOf( '*' ) );
+                    // remove a tailing directory separator, if needed.
+                    if ( searchPath.EndsWith( Path.DirectorySeparatorChar ) ) {
+                        searchPath = searchPath.Substring( 0, searchPath.Length - 1 );
+                    }
+                }
+
+                string incFileSearchPath = srcFileSearchPath + Path.DirectorySeparatorChar + searchPath;
+                if ( Directory.Exists( incFileSearchPath ) == false ) continue;
+
+                string[] incItems = Directory.GetFiles( incFileSearchPath, "*.cs", SearchOption.AllDirectories );
+
+                foreach ( string resultPath in incItems ) {
+
+                    if ( File.Exists( resultPath ) == false ) continue; // ignore directories etc.
+
+                    string filePath = Path.GetRelativePath( srcFileSearchPath, resultPath );
+
+                    Console.WriteLine( "addsrc INCLUDE: " + filePath );
+
+                    srcFileNames.Add( filePath );
+                }
             }
 
             // do not create a project, if it is an empty one.
@@ -751,8 +811,6 @@ lrwxrwxrwx 1 root root       23 Jun 15 01:06 /usr/lib/mono/4.0/mscorlib.dll -> .
 
                 if ( dllName == "netstandard.dll" ) dllPath = "/usr/lib/mono/4.5/Facades/" + dllName;
 
-
-
             } else if ( runtime == "dotnet" ) {
 
                 string libPath = null;
@@ -762,11 +820,13 @@ lrwxrwxrwx 1 root root       23 Jun 15 01:06 /usr/lib/mono/4.0/mscorlib.dll -> .
                 if ( targetFramework == "netstandard2.0" ) targetFramework = "netcoreapp3.1";
 
                 if ( targetFramework == "netcoreapp3.1" ) {
-                    libPath = "/usr/share/dotnet/shared/Microsoft.NETCore.App/3.1.27";
+                    // this path is for dotnet-SDK version 3.1.422:
+                    libPath = "/usr/share/dotnet/shared/Microsoft.NETCore.App/3.1.28";
                 }
 
                 if ( targetFramework == "net6.0" ) {
-                    libPath = "/usr/share/dotnet/shared/Microsoft.NETCore.App/6.0.7";
+                    // this path is for dotnet-SDK version 6.0.400:
+                    libPath = "/usr/share/dotnet/shared/Microsoft.NETCore.App/6.0.8";
                 }
 
                 if ( libPath != null ) {
@@ -781,7 +841,7 @@ lrwxrwxrwx 1 root root       23 Jun 15 01:06 /usr/lib/mono/4.0/mscorlib.dll -> .
                 Console.WriteLine();
                 Console.WriteLine( "ERROR: NewVsProjectFileReader.GetDllPath() failed." );
                 Console.WriteLine( "  =>  could not find dll " + dllName + " for " + runtime + " / " + targetFramework + "." );
-                Console.WriteLine( "  =>  see NewVsProjectFileReader.cs around line 700 and check the paths in your local system." );
+                Console.WriteLine( "  =>  see NewVsProjectFileReader.cs around line 840 and check the paths in your local system." );
                 Console.WriteLine();
                 throw new Exception( "dllPath not found" );
             }
@@ -884,8 +944,6 @@ lrwxrwxrwx 1 root root       23 Jun 15 01:06 /usr/lib/mono/4.0/mscorlib.dll -> .
                 throw new Exception( "EXCEPTION when reading file: " + projectAssetsPath );
             }
 
-            //throw new Exception( "KESKEN_asset_homma" );
-
             // then loop over packages, and add dependencies for each of them.
             // do this in multiple stages, until no more new dependencies are found.
 
@@ -969,9 +1027,10 @@ lrwxrwxrwx 1 root root       23 Jun 15 01:06 /usr/lib/mono/4.0/mscorlib.dll -> .
 
                 minLimit = pkgVersion;
                 //minLimitIsInclusive = true;
-// HUOM!!! KORJAA...
-// HUOM!!! KORJAA...
-// HUOM!!! KORJAA...
+
+// TODO this is not yet complete???
+// TODO this is not yet complete???
+// TODO this is not yet complete???
 
             } else {
 
@@ -997,7 +1056,9 @@ lrwxrwxrwx 1 root root       23 Jun 15 01:06 /usr/lib/mono/4.0/mscorlib.dll -> .
 
                 // new setup the minLimit and maxLimit according to the rule...
 
-
+// TODO this is not yet complete???
+// TODO this is not yet complete???
+// TODO this is not yet complete???
 
             }
 

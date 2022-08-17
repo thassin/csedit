@@ -7,9 +7,9 @@ namespace SampleFiles
         public void MethodB()
         {
             string name = "Joe";
+
             var a = new ClassA();
             a.MethodA( name );
         }
     }
 }
-

@@ -8,6 +8,7 @@ namespace TestProject02
         static void Main(string[] args)
         {
             Console.WriteLine("Hello World!");
+
             MyClass test = new MyClass();
             test.MyInt = 100;
             test.MyString = "Bye!";
