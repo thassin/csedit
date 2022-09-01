@@ -2,7 +2,7 @@
 ﻿using System.Collections.Generic;
 ﻿using System.IO;
 using System.Reflection;
-﻿using System.Threading;
+using System.Threading;
 
 using Microsoft.CodeAnalysis; // SourceCodeKind etc
 using Microsoft.CodeAnalysis.CSharp; // LanguageVersion etc
@@ -179,11 +179,11 @@ namespace CsEdit.Avalonia {
 
 
     public interface IEditorWindowEventListener {
+
         void EditorWindowOpened( DocumentId docId );
         void EditorWindowClosed( DocumentId docId );
-// TODO need to add the modified/saved events here as well???
-// TODO need to add the modified/saved events here as well???
-// TODO need to add the modified/saved events here as well???
+
+        void DocumentIsModified( DocumentId docId, bool isModified );
     }
 
 
@@ -427,14 +427,14 @@ namespace CsEdit.Avalonia {
 
                     if ( forSingleDocumentOnly != null && forSingleDocumentOnly != docId ) continue;
 
-                    if ( di.TextModificationCount < 1 ) {
+                    if ( di.TextHasModificationsToRoslynDocument == false ) {
                         Console.WriteLine( "SyncAllModifiedContainersToDocuments() : is up-to-date : " + entry.Key );
                         continue;
                     }
 
                     Document doc = _sol.GetProject( projId ).GetDocument( docId );
                     doc = doc.WithText( GetCurrentTextFromContainer( docId ) );
-                    di.ResetTextModificationCount();
+                    di.ResetHasModificationsToRoslynDocument();
 
                     // solution is updated?
                     // the same is for project, but we don't use it here.
@@ -506,6 +506,31 @@ namespace CsEdit.Avalonia {
                         entry.Value.currentTextContainer = null;
 
                         if ( Listener != null ) Listener.EditorWindowClosed( docId );
+
+                        return;
+                    }
+                }
+            }
+            throw new Exception( "ERROR no document found for DocumentId " + docId.ToString() );
+        }
+
+        public void SaveDocumentToFile( DocumentId docId ) {
+            Dictionary<DocumentId,string> d = new Dictionary<DocumentId,string>();
+            foreach ( ProjectInfo_p pd in _projects ) {
+                foreach( KeyValuePair<DocumentId,DocumentInfo_p> entry in pd.docInfoDict ) {
+                    if ( entry.Key == docId ) {
+
+                        // take the latest text from textContainer, and save it into file.
+
+                        string contents = GetCurrentTextFromContainer( docId ).ToString();
+                        string filePath = ProjectsProvider.WorkingDirectory + Path.DirectorySeparatorChar + entry.Value.FilePathUniq;
+                        File.WriteAllText( filePath, contents, System.Text.Encoding.UTF8 );
+
+                        // clear the undo-stack from textContainer and reset the file modification tracking.
+                        // => now the undo/redo logic and file modification tracking are set in sync.
+
+                        entry.Value.currentTextContainer.Document.UndoStack.ClearAll();
+                        if ( Listener != null ) Listener.DocumentIsModified( docId, false );
 
                         return;
                     }
@@ -776,10 +801,8 @@ namespace CsEdit.Avalonia {
 
         public bool IsEditorWindowOpen { get { return currentEditorWindow != null; } }
 
-// TODO eventually need to have 2 separate modification counters:
-// 1) modifications since last sync to Roslyn Document object (the current counter).
-// 2) modifications since last saving to file (TODO...)
-        public int TextModificationCount { get; private set; }
+        public bool TextHasModificationsToRoslynDocument { get; private set; }
+        public bool TextHasModificationsToSavedFile { get; private set; }
 
         public DocumentInfo_p( DocumentId docId, string filePath ) {
             DocId = docId;
@@ -788,15 +811,44 @@ namespace CsEdit.Avalonia {
             currentEditorWindow = null;
             currentTextContainer = null;
 
-            ResetTextModificationCount();
+            ResetHasModificationsToRoslynDocument();
         }
 
-        public void DocumentModified() {
-            TextModificationCount++;
+        public void DocumentModified( bool undoIsPossible ) {
+            TextHasModificationsToRoslynDocument = true;
+
+            // if undo is not possible, then we have made "undo" operations
+            // enough to cancel all previous text modifications, and
+            // the text is now in sync with the saved file.
+
+            bool oldValue = TextHasModificationsToSavedFile;
+            if ( undoIsPossible == false ) {
+                TextHasModificationsToSavedFile = false;
+            } else {
+                TextHasModificationsToSavedFile = true;
+            }
+
+            if ( oldValue != TextHasModificationsToSavedFile ) {
+
+                // TODO update the document state in UI.
+
+                if ( TextHasModificationsToSavedFile ) {
+                    Console.WriteLine( "SAVE: the file has modifications!" );
+                } else {
+                    Console.WriteLine( "SAVE: undo not possible => the file has no modifications!" );
+                }
+            }
         }
 
-        public void ResetTextModificationCount() {
-            TextModificationCount = 0;
+        public void ResetHasModificationsToRoslynDocument() {
+            TextHasModificationsToRoslynDocument = false;
+        }
+
+// TODO this is currently never used...
+// TODO this is currently never used...
+// TODO this is currently never used...
+        public void ResetHasModificationsToSavedFile() {
+            TextHasModificationsToSavedFile = false;
         }
     }
 

@@ -23,12 +23,17 @@ using System.Windows.Input;
 
 namespace RoslynPad.Editor
 {
+    public interface IDocumentKeyboardCommandsTracker {
+        void SaveDocument();
+    }
+
     public class RoslynCodeEditor : CodeTextEditor
     {
         private readonly TextMarkerService _textMarkerService;
         private BraceMatcherHighlightRenderer? _braceMatcherHighlighter;
         private ContextActionsRenderer? _contextActionsRenderer;
         private IClassificationHighlightColors? _classificationHighlightColors;
+        private IDocumentKeyboardCommandsTracker? _tracker;
         private IRoslynHost? _roslynHost;
         private DocumentId? _documentId;
         private IQuickInfoProvider? _quickInfoProvider;
@@ -122,8 +127,9 @@ namespace RoslynPad.Editor
 
 
 
-        public DocumentId Initialize_alt( RoslynHost roslynHost, RoslynWorkspace workspace, DocumentId docId, string currentText, IClassificationHighlightColors highlightColors, out AvalonEditTextContainer container )
+        public DocumentId Initialize_alt( IDocumentKeyboardCommandsTracker? tracker, RoslynHost roslynHost, RoslynWorkspace workspace, DocumentId docId, string currentText, IClassificationHighlightColors highlightColors, out AvalonEditTextContainer container )
         {
+            _tracker = tracker ?? throw new ArgumentNullException(nameof(tracker));
             _roslynHost = roslynHost ?? throw new ArgumentNullException(nameof(roslynHost));
             _classificationHighlightColors = highlightColors ?? throw new ArgumentNullException(nameof(highlightColors));
 
@@ -380,8 +386,6 @@ Console.WriteLine( "RCE.OnKeyDown() : " + e.Key + " " + e.HasModifiers(ModifierK
 
             base.OnKeyDown(e);
 
-// TODO add CTRL-S => save the file to filesystem?
-
             if (e.HasModifiers(ModifierKeys.Control))
             {
                 switch (e.Key)
@@ -391,6 +395,11 @@ Console.WriteLine( "RCE.OnKeyDown() : " + e.Key + " " + e.HasModifiers(ModifierK
                     case Key.B:
 Console.WriteLine( "TryJumpToBrace" );
                         TryJumpToBrace();
+                        break;
+
+                    // CTRL-S => save the file to filesystem.
+                    case Key.S:
+                        _tracker?.SaveDocument();
                         break;
                 }
             }

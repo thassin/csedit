@@ -35,7 +35,7 @@ using Microsoft.CodeAnalysis.Scripting.Hosting;
 
 namespace CsEdit.Avalonia
 {
-    public partial class CsEditCodeEditorWindow : Window
+    public partial class CsEditCodeEditorWindow : Window, IDocumentKeyboardCommandsTracker
     {
         private ProjectId _projectId;
         private DocumentId _documentId;
@@ -222,7 +222,7 @@ Console.WriteLine( string.Format("Line {0} Column {1}", _editorControl.TextArea.
             RoslynWorkspace ws = CsEditWorkspace.Instance.GetRoslynWorkspace();
 
             string currentText = CsEditWorkspace.Instance.GetCurrentText( docId );
-            var documentId = editor.Initialize_alt(host, ws, docId, currentText, new ClassificationHighlightColors(), out AvalonEditTextContainer container );
+            var documentId = editor.Initialize_alt( this, host, ws, docId, currentText, new ClassificationHighlightColors(), out AvalonEditTextContainer container );
 
             IDocumentModificationsTracker tracker = CsEditWorkspace.Instance.GetTracker( docId );
             container.SetTracker( tracker );
@@ -249,7 +249,9 @@ Console.WriteLine( string.Format("Line {0} Column {1}", _editorControl.TextArea.
             CsEditWorkspace.Instance.SetEditorWindowAsClosed( _documentId );
         }
 
-
+        public void SaveDocument() {
+            CsEditWorkspace.Instance.SaveDocumentToFile( _documentId );
+        }
 
 #region internalclass
 

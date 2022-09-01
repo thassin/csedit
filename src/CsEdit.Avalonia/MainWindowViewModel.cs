@@ -197,8 +197,11 @@ if ( span.HasValue ) wnd.SelectAndShowTextSpan( span.Value.Start, span.Value.Len
             }
         }
 
+        public void DocumentIsModified( DocumentId docId, bool isModified ) {
 
+Console.WriteLine( "MOD: " + docId + " isModified=" + isModified );
 
+        }
     }
-}
 
+}

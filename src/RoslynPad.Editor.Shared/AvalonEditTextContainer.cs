@@ -17,7 +17,7 @@ using RoslynPad.Roslyn;
 namespace RoslynPad.Editor
 {
     public interface IDocumentModificationsTracker {
-        void DocumentModified();
+        void DocumentModified( bool undoIsPossible  );
     }
 
     public sealed class AvalonEditTextContainer : SourceTextContainer, IEditorCaretProvider, IDisposable
@@ -62,7 +62,7 @@ Console.WriteLine( "AETC.DocumentOnChanged -> forward the text modifications" );
 
             if (_updatding) return;
 
-            if ( _tracker != null ) _tracker.DocumentModified();
+            if ( _tracker != null ) _tracker.DocumentModified( Document.UndoStack.CanUndo );
 
             var oldText = _currentText;
 
@@ -77,6 +77,7 @@ Console.WriteLine( "AETC.DocumentOnChanged -> forward the text modifications" );
 
         public void UpdateText(SourceText newText)
         {
+// TODO is this never called (normally when just typing the text).
             _updatding = true;
             Document.BeginUpdate();
             var editor = Editor;
